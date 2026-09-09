@@ -1,0 +1,136 @@
+{
+  "root": ".",
+  "port": 3000,
+  "clis": {
+    "bash": {
+      "command": "C:/Program Files/Git/bin/bash.exe",
+      "args": [
+        "-i",
+        "-l"
+      ]
+    },
+    "claude": {
+      "command": "claude"
+    },
+    "gemini": {
+      "command": "gemini"
+    },
+    "codex": {
+      "command": "codex"
+    }
+  },
+  "agents": {
+    "piloto": {
+      "label": "PILOTO",
+      "cor": "#e2703a",
+      "cli": "claude",
+      "model": "opus",
+      "effort": "high",
+      "papel": "Você é o PILOTO. Conduz a missão de ponta a ponta: decide a ordem, implementa e integra o trabalho dos outros painéis."
+    },
+    "builder": {
+      "label": "BUILDER",
+      "cor": "#4fb286",
+      "cli": "claude",
+      "model": "sonnet",
+      "effort": "medium",
+      "papel": "Você é o BUILDER. Implementa exatamente o que foi pedido, sem alargar escopo. Código enxuto, no padrão do que já existe."
+    },
+    "reviewer": {
+      "label": "REVIEWER",
+      "cor": "#9d7bd8",
+      "cli": "claude",
+      "model": "opus",
+      "effort": "high",
+      "papel": "Você é o REVIEWER. Não escreve código de produção: lê o diff, procura bug de verdade e reporta com arquivo:linha."
+    },
+    "scout": {
+      "label": "SCOUT",
+      "cor": "#4a9fd8",
+      "cli": "claude",
+      "model": "haiku",
+      "effort": "low",
+      "papel": "Você é o SCOUT. Explora o repositório e responde onde as coisas estão. Não edita arquivo nenhum."
+    },
+    "torre": {
+      "label": "TORRE",
+      "cor": "#c9628f",
+      "cli": "codex",
+      "papel": "Você é a TORRE. Segunda opinião de outro provedor sobre a mesma tarefa."
+    },
+    "shell": {
+      "label": "SHELL",
+      "cor": "#7d8894",
+      "cli": "bash"
+    }
+  },
+  "squads": {
+    "revisao": {
+      "label": "REVISÃO",
+      "descricao": "um constrói, dois auditam em paralelo",
+      "fases": [
+        {
+          "nome": "build",
+          "agentes": [
+            "piloto",
+            "builder"
+          ]
+        },
+        {
+          "nome": "auditoria",
+          "agentes": [
+            "reviewer",
+            "scout"
+          ]
+        }
+      ]
+    },
+    "paralelo": {
+      "label": "PARALELO",
+      "descricao": "quatro agentes atacando o mesmo brief de ângulos diferentes",
+      "fases": [
+        {
+          "nome": "ataque",
+          "agentes": [
+            "piloto",
+            "builder",
+            "scout",
+            "torre"
+          ]
+        }
+      ]
+    }
+  },
+  "precos": {
+    "claude-fable-5": {
+      "in": 10,
+      "out": 50,
+      "cacheWrite": 12.5,
+      "cacheRead": 1
+    },
+    "claude-opus-5": {
+      "in": 5,
+      "out": 25,
+      "cacheWrite": 6.25,
+      "cacheRead": 0.5
+    },
+    "claude-opus-4-8": {
+      "in": 5,
+      "out": 25,
+      "cacheWrite": 6.25,
+      "cacheRead": 0.5
+    },
+    "claude-sonnet-5": {
+      "in": 2,
+      "out": 10,
+      "cacheWrite": 2.5,
+      "cacheRead": 0.2
+    },
+    "claude-haiku-4-5": {
+      "in": 1,
+      "out": 5,
+      "cacheWrite": 1.25,
+      "cacheRead": 0.1
+    }
+  }
+}

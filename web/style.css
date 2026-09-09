@@ -1,0 +1,516 @@
+/*
+  Cockpit — prancheta de trabalho.
+
+  A interface é o papel: ardósia azul-tinta, fios visíveis, tinta macia.
+  A única cor saturada da tela vem dos agentes. Nenhuma cor de marca.
+  Monoespaçada só onde o texto é de máquina.
+*/
+
+:root {
+  --ground: #12171d;
+  --raised: #171e26;
+  --bar: #1b232c;
+  --sunk: #0e1319;
+  --rule: #262f39;
+  --rule-soft: #1e262f;
+
+  --ink: #dfe5ec;
+  --ink-2: #9aa7b5;
+  --ink-3: #6b7885;
+  --ink-4: #4a5561;
+
+  --warn: #d9a441;
+  --ok: #4fb286;
+
+  --ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --mono: "Cascadia Mono", "Cascadia Code", Consolas, "DejaVu Sans Mono", monospace;
+
+  --pane: var(--ink-3);
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font: 13px/1.5 var(--ui);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, select, input { font: inherit; color: inherit; }
+
+:focus-visible { outline: 2px solid var(--pane); outline-offset: 1px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* ---------- casca ---------- */
+
+.cockpit { display: flex; flex-direction: column; height: 100%; }
+
+.deck { display: flex; flex: 1; min-height: 0; }
+
+/* ---------- barra lateral única, duas zonas ---------- */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  width: 232px;
+  background: var(--sunk);
+  border-right: 1px solid var(--rule);
+  min-height: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 11px 14px 10px;
+  border-bottom: 1px solid var(--rule);
+}
+.brand strong { font-size: 14px; font-weight: 650; letter-spacing: -0.01em; }
+.brand span { color: var(--ink-4); font-size: 11px; font-family: var(--mono); }
+
+.zone { display: flex; flex-direction: column; min-height: 0; }
+.zone.missions { flex: 0 0 auto; max-height: 42%; border-bottom: 1px solid var(--rule); }
+.zone.files { flex: 1; }
+
+.zone-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 9px 14px 7px;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 600;
+}
+.zone-head .count { color: var(--ink-4); font-family: var(--mono); font-weight: 400; }
+.zone-head .spacer { flex: 1; }
+
+.icon-btn {
+  border: none;
+  background: none;
+  padding: 0 2px;
+  color: var(--ink-4);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.icon-btn:hover:not(:disabled) { color: var(--ink); }
+.icon-btn:disabled { opacity: 0.35; cursor: default; }
+
+.zone-body { flex: 1; overflow: auto; padding-bottom: 8px; }
+
+/* ---------- missões ---------- */
+
+.mrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 14px;
+  border: none;
+  border-left: 2px solid transparent;
+  background: none;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.mrow:hover { background: #ffffff06; color: var(--ink); }
+.mrow.active {
+  background: #ffffff0a;
+  border-left-color: var(--ink-2);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.mrow .nome {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Um ponto por painel, na cor do agente: a missão diz quem está nela. */
+.crew { display: flex; gap: 3px; flex: none; align-items: center; }
+.crew i { width: 5px; height: 5px; border-radius: 50%; display: block; }
+.crew .nenhum { color: var(--ink-4); font-family: var(--mono); font-size: 10px; font-style: normal; }
+
+.squad-flag {
+  flex: none;
+  padding: 0 4px;
+  border-radius: 2px;
+  background: #ffffff12;
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: 9.5px;
+}
+
+.name-input {
+  width: calc(100% - 20px);
+  margin: 2px 10px 6px;
+  padding: 4px 7px;
+  background: var(--ground);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  font-size: 12px;
+  outline: none;
+}
+.name-input:focus { border-color: var(--ink-3); }
+
+/* ---------- árvore de arquivos ---------- */
+
+.fnode {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 2.5px 14px 2.5px 8px;
+  border: none;
+  background: none;
+  color: var(--ink-2);
+  font-size: 12px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.fnode:hover { background: #ffffff06; color: var(--ink); }
+.fnode.ativo { background: #ffffff0d; color: var(--ink); }
+.fnode .caret { flex: none; width: 9px; color: var(--ink-4); font-size: 9px; }
+.fnode .nome { overflow: hidden; text-overflow: ellipsis; }
+
+/* Arquivo mexido por um agente enquanto você olhava para outro lugar. */
+.fnode.tocado .nome { color: var(--warn); }
+.fnode.tocado::after {
+  content: "";
+  flex: none;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--warn);
+  margin-left: auto;
+}
+
+.vazio-nota { padding: 6px 14px; margin: 0; color: var(--ink-4); font-size: 11.5px; }
+
+/* ---------- bancada ---------- */
+
+.bench { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+
+.headline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  height: 40px;
+  padding: 0 12px 0 14px;
+  background: var(--bar);
+  border-bottom: 1px solid var(--rule);
+}
+
+.headline h1 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.headline h1.mudo { color: var(--ink-4); font-weight: 400; }
+
+.branch {
+  padding: 1.5px 7px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.spacer { flex: 1; }
+
+.picker {
+  padding: 4px 6px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--ground);
+  color: var(--ink-2);
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+}
+.picker:hover { color: var(--ink); }
+
+.btn {
+  padding: 4px 11px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--ground);
+  color: var(--ink-2);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-4); }
+.btn:disabled { opacity: 0.4; cursor: default; }
+.btn.solid { background: var(--pane); border-color: var(--pane); color: #0d1116; font-weight: 600; }
+.btn.solid:hover:not(:disabled) { filter: brightness(1.12); color: #0d1116; }
+.btn.quiet { border-color: transparent; background: none; color: var(--ink-4); }
+.btn.quiet:hover:not(:disabled) { color: var(--ink); background: #ffffff0a; }
+
+/* ---------- briefing do squad ---------- */
+
+.brief {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 7px 12px 7px 14px;
+  background: var(--sunk);
+  border-bottom: 1px solid var(--rule);
+  font-size: 12px;
+}
+
+.brief-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 9px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--ground);
+  font-size: 12px;
+  outline: none;
+}
+.brief-input:focus { border-color: var(--ink-4); }
+.brief-input::placeholder { color: var(--ink-4); }
+
+/* As fases são uma sequência real: a ordem carrega informação. */
+.phases { display: flex; align-items: center; }
+.phase {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border: 1px solid var(--rule);
+  border-right-width: 0;
+  color: var(--ink-4);
+  font-size: 11.5px;
+}
+.phase:first-child { border-radius: 3px 0 0 3px; }
+.phase:last-child { border-right-width: 1px; border-radius: 0 3px 3px 0; }
+.phase.feita { color: var(--ok); }
+.phase.atual { color: var(--ink); background: #ffffff0d; font-weight: 600; }
+.phase .n { color: var(--ink-4); font-family: var(--mono); font-size: 10px; }
+
+.brief-texto {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-3);
+}
+
+/* ---------- aviso ---------- */
+
+.aviso {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: none;
+  padding: 8px 12px 8px 14px;
+  background: #2a2114;
+  border-bottom: 1px solid #4a3a1c;
+  color: #f0d5a0;
+  font-size: 12px;
+}
+.aviso button { margin-left: auto; border: none; background: none; color: inherit; cursor: pointer; }
+
+/* ---------- área de trabalho ---------- */
+
+.work { display: flex; flex: 1; min-height: 0; min-width: 0; }
+.panes-wrap { display: flex; flex: 1; min-width: 0; }
+.work.dividido .panes-wrap { flex: 1 1 54%; }
+
+.panes {
+  display: grid;
+  gap: 6px;
+  padding: 6px;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  grid-auto-rows: 1fr;
+}
+
+/* Painel: cartão levantado com aba na cor do agente. Sem borda. */
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--raised);
+  border-radius: 3px;
+  border-top: 2px solid var(--pane);
+  overflow: hidden;
+}
+.pane:focus-within { background: #1a212a; }
+
+.pane-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: none;
+  min-height: 30px;
+  padding: 5px 8px 5px 11px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.who { color: var(--pane); font-size: 12px; font-weight: 650; white-space: nowrap; }
+.model { color: var(--ink-4); font-family: var(--mono); font-size: 10.5px; white-space: nowrap; }
+
+/* A assinatura: forma do último minuto de saída, não só o instante atual. */
+.spark {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  flex: none;
+  height: 13px;
+  width: 84px;
+  opacity: 0.85;
+}
+.spark i {
+  display: block;
+  flex: 1;
+  min-height: 1px;
+  background: var(--pane);
+  border-radius: 0.5px;
+}
+.spark i.zero { background: var(--rule); }
+
+.parado { color: var(--ink-4); font-size: 11px; white-space: nowrap; }
+
+.meter {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-left: auto;
+  flex: none;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.meter .custo { color: var(--ink-2); }
+
+.pane-term { flex: 1; min-height: 0; padding: 6px 0 0 10px; overflow: hidden; }
+
+/* ---------- editor ---------- */
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 46%;
+  min-width: 0;
+  min-height: 0;
+  background: var(--raised);
+  border-left: 1px solid var(--rule);
+}
+
+.editor-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: none;
+  min-height: 30px;
+  padding: 5px 8px 5px 12px;
+  border-bottom: 1px solid var(--rule-soft);
+  font-size: 12px;
+}
+
+.editor-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+.editor-path.sujo { color: var(--warn); }
+
+.editor-host { flex: 1; min-height: 0; overflow: hidden; }
+.editor-host .cm-editor { height: 100%; }
+
+/* ---------- régua de instrumentos ---------- */
+
+.gauges {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 26px;
+  background: var(--bar);
+  border-top: 1px solid var(--rule);
+  font-size: 11.5px;
+}
+
+.gauge {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  height: 100%;
+  padding: 0 12px;
+  border-right: 1px solid var(--rule-soft);
+  color: var(--ink-3);
+  line-height: 26px;
+  white-space: nowrap;
+}
+.gauge b { color: var(--ink); font-weight: 600; font-family: var(--mono); font-size: 11px; }
+.gauge.alerta b { color: var(--warn); }
+.gauge.raiz {
+  margin-left: auto;
+  border-right: none;
+  border-left: 1px solid var(--rule-soft);
+  color: var(--ink-4);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  max-width: 48ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+
+/* ---------- telas vazias: convite, não decoração ---------- */
+
+.blank {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 48px;
+  min-width: 0;
+}
+.blank p { margin: 0; max-width: 54ch; }
+.blank h2 { margin: 0 0 2px; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.blank .sub { color: var(--ink-2); font-size: 13px; }
+.blank .como { color: var(--ink-4); font-size: 12.5px; }
+.blank code {
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--sunk);
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
