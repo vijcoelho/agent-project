@@ -1,295 +1,327 @@
-/*
-  Cockpit — prancheta de trabalho.
+/* ==========================================================================
+   COCKPIT — preto total, azul neon.
 
-  A interface é o papel: ardósia azul-tinta, fios visíveis, tinta macia.
-  A única cor saturada da tela vem dos agentes. Nenhuma cor de marca.
-  Monoespaçada só onde o texto é de máquina.
-*/
+   Para mudar a cara inteira, mexa só no bloco AJUSTES abaixo.
+   Trocar --neon troca o acento do produto todo.
+   ========================================================================== */
 
 :root {
-  --ground: #12171d;
-  --raised: #171e26;
-  --bar: #1b232c;
-  --sunk: #0e1319;
-  --rule: #262f39;
-  --rule-soft: #1e262f;
+  /* ---- AJUSTES: é aqui que se mexe ---- */
+  --neon: #4195ff;
+  --raio: 7px;
+  --densidade: 1; /* 0.9 aperta tudo, 1.1 dá respiro */
+  --fonte-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --fonte-mono: "Cascadia Mono", "Cascadia Code", Consolas, monospace;
 
-  --ink: #dfe5ec;
-  --ink-2: #9aa7b5;
-  --ink-3: #6b7885;
-  --ink-4: #4a5561;
+  /* ---- derivados do neon: não precisa mexer ---- */
+  --neon-forte: color-mix(in srgb, var(--neon) 100%, #fff 25%);
+  --neon-linha: color-mix(in srgb, var(--neon) 45%, transparent);
+  --neon-fio: color-mix(in srgb, var(--neon) 16%, transparent);
+  --neon-fundo: color-mix(in srgb, var(--neon) 12%, transparent);
+  --neon-vidro: color-mix(in srgb, var(--neon) 7%, transparent);
+  --brilho: 0 0 14px color-mix(in srgb, var(--neon) 30%, transparent);
+  --brilho-forte: 0 0 8px color-mix(in srgb, var(--neon) 65%, transparent);
 
-  --warn: #d9a441;
-  --ok: #4fb286;
+  /* ---- superfícies ---- */
+  --preto: #050608;
+  --carta: #060708;
+  --barra: #0c0e12;
+  --fio: #1b2029;
+  --fio-forte: #2b3442;
 
-  --ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  --mono: "Cascadia Mono", "Cascadia Code", Consolas, "DejaVu Sans Mono", monospace;
+  /* ---- tinta ---- */
+  --ink: #e6edf3;
+  --ink-2: #a8b2c2;
+  --ink-3: #8b98ab;
+  --ink-4: #78869a;
 
-  --pane: var(--ink-3);
+  /* ---- sinais ---- */
+  --alerta: #e0a33a;
+  --ok: #3ecf8e;
+
+  /* ---- escala ---- */
+  --t-nano: 9.5px;
+  --t-mini: 11px;
+  --t-base: 12px;
+  --t-med: 13px;
+  --gap: calc(8px * var(--densidade));
+  --pad: calc(10px * var(--densidade));
+
+  --pane: var(--neon);
 }
 
 * { box-sizing: border-box; }
-
 html, body, #root { height: 100%; margin: 0; }
 
 body {
-  background: var(--ground);
+  background: var(--preto);
   color: var(--ink);
-  font: 13px/1.5 var(--ui);
+  font: var(--t-med) / 1.5 var(--fonte-ui);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
-button, select, input { font: inherit; color: inherit; }
-
-:focus-visible { outline: 2px solid var(--pane); outline-offset: 1px; }
+button, select, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 1px solid var(--neon); outline-offset: 1px; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 
-/* ---------- casca ---------- */
+@keyframes respira { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* ==========================================================================
+   1. ESQUELETO
+   ========================================================================== */
 
 .cockpit { display: flex; flex-direction: column; height: 100%; }
-
 .deck { display: flex; flex: 1; min-height: 0; }
+.spacer { flex: 1; }
 
-/* ---------- barra lateral única, duas zonas ---------- */
+.bench { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.work { display: flex; flex: 1; min-height: 0; min-width: 0; }
+.panes-wrap { display: flex; flex: 1; min-width: 0; }
+.work.dividido .panes-wrap { flex: 1 1 54%; }
 
-.sidebar {
-  display: flex;
-  flex-direction: column;
-  flex: none;
-  width: 232px;
-  background: var(--sunk);
-  border-right: 1px solid var(--rule);
-  min-height: 0;
-}
-
-.brand {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  padding: 11px 14px 10px;
-  border-bottom: 1px solid var(--rule);
-}
-.brand strong { font-size: 14px; font-weight: 650; letter-spacing: -0.01em; }
-.brand span { color: var(--ink-4); font-size: 11px; font-family: var(--mono); }
-
-.zone { display: flex; flex-direction: column; min-height: 0; }
-.zone.missions { flex: 0 0 auto; max-height: 42%; border-bottom: 1px solid var(--rule); }
-.zone.files { flex: 1; }
-
-.zone-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: none;
-  padding: 9px 14px 7px;
-  color: var(--ink-3);
-  font-size: 11px;
-  font-weight: 600;
-}
-.zone-head .count { color: var(--ink-4); font-family: var(--mono); font-weight: 400; }
-.zone-head .spacer { flex: 1; }
-
-.icon-btn {
-  border: none;
-  background: none;
-  padding: 0 2px;
-  color: var(--ink-4);
-  font-size: 15px;
-  line-height: 1;
-  cursor: pointer;
-  border-radius: 2px;
-}
-.icon-btn:hover:not(:disabled) { color: var(--ink); }
-.icon-btn:disabled { opacity: 0.35; cursor: default; }
-
-.zone-body { flex: 1; overflow: auto; padding-bottom: 8px; }
-
-/* ---------- missões ---------- */
-
-.mrow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 5px 14px;
-  border: none;
-  border-left: 2px solid transparent;
-  background: none;
-  color: var(--ink-2);
-  font-size: 12.5px;
-  text-align: left;
-  cursor: pointer;
-}
-.mrow:hover { background: #ffffff06; color: var(--ink); }
-.mrow.active {
-  background: #ffffff0a;
-  border-left-color: var(--ink-2);
-  color: var(--ink);
-  font-weight: 600;
-}
-
-.mrow .nome {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
+/* ==========================================================================
+   2. ARQUIVOS, MEMORIA E LISTAS
 /* Um ponto por painel, na cor do agente: a missão diz quem está nela. */
-.crew { display: flex; gap: 3px; flex: none; align-items: center; }
-.crew i { width: 5px; height: 5px; border-radius: 50%; display: block; }
-.crew .nenhum { color: var(--ink-4); font-family: var(--mono); font-size: 10px; font-style: normal; }
+.crew { display: flex; align-items: center; gap: 3px; flex: none; }
+.crew i { display: block; width: 5px; height: 5px; border-radius: 50%; }
+.crew .nenhum { color: var(--ink-4); font-family: var(--fonte-mono); font-size: 10px; font-style: normal; }
 
 .squad-flag {
   flex: none;
   padding: 0 4px;
   border-radius: 2px;
-  background: #ffffff12;
-  color: var(--ink-3);
-  font-family: var(--mono);
-  font-size: 9.5px;
+  background: var(--neon-fundo);
+  color: var(--neon);
+  font-family: var(--fonte-mono);
+  font-size: var(--t-nano);
 }
 
-.name-input {
-  width: calc(100% - 20px);
-  margin: 2px 10px 6px;
-  padding: 4px 7px;
-  background: var(--ground);
-  border: 1px solid var(--rule);
-  border-radius: 3px;
-  font-size: 12px;
-  outline: none;
-}
-.name-input:focus { border-color: var(--ink-3); }
-
-/* ---------- árvore de arquivos ---------- */
+/* ---- árvore de arquivos ---- */
 
 .fnode {
   display: flex;
   align-items: center;
   gap: 5px;
   width: 100%;
-  padding: 2.5px 14px 2.5px 8px;
+  padding: 2.5px var(--pad) 2.5px 8px;
   border: none;
   background: none;
   color: var(--ink-2);
-  font-size: 12px;
+  font-size: var(--t-base);
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
 }
-.fnode:hover { background: #ffffff06; color: var(--ink); }
-.fnode.ativo { background: #ffffff0d; color: var(--ink); }
+.fnode:hover { background: var(--neon-vidro); color: var(--ink); }
+.fnode.ativo { background: var(--neon-fundo); color: var(--ink); }
 .fnode .caret { flex: none; width: 9px; color: var(--ink-4); font-size: 9px; }
 .fnode .nome { overflow: hidden; text-overflow: ellipsis; }
 
-/* Arquivo mexido por um agente enquanto você olhava para outro lugar. */
-.fnode.tocado .nome { color: var(--warn); }
+/* Arquivo mexido por um agente enquanto você olhava para outro lado. */
+.fnode.tocado .nome { color: var(--alerta); }
 .fnode.tocado::after {
   content: "";
   flex: none;
   width: 4px;
   height: 4px;
-  border-radius: 50%;
-  background: var(--warn);
   margin-left: auto;
+  border-radius: 50%;
+  background: var(--alerta);
 }
 
-.vazio-nota { padding: 6px 14px; margin: 0; color: var(--ink-4); font-size: 11.5px; }
+.vazio-nota { margin: 0; padding: 6px var(--pad); color: var(--ink-4); font-size: var(--t-mini); }
 
-/* ---------- bancada ---------- */
+/* ---- memória ---- */
 
-.bench { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
 
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: none;
+  border-radius: var(--raio);
+  background: none;
+  color: var(--ink-4);
+  font-size: var(--t-mini);
+  font-weight: 600;
+  cursor: pointer;
+}
+.tab:hover { color: var(--ink-2); }
+.tab.on { color: var(--neon); background: var(--neon-fundo); }
+.tab .count {
+  padding: 0 4px;
+  border-radius: 6px;
+  background: var(--neon-fio);
+  color: inherit;
+  font-family: var(--fonte-mono);
+  font-size: var(--t-nano);
+  font-weight: 400;
+}
+
+.nota {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px var(--pad);
+  border-bottom: 1px solid var(--fio);
+  font-size: var(--t-mini);
+  line-height: 1.45;
+}
+.nota:hover { background: var(--neon-vidro); }
+.nota .quem { flex: none; color: var(--neon); font-family: var(--fonte-mono); font-size: var(--t-nano); }
+.nota .texto { flex: 1; min-width: 0; color: var(--ink-2); }
+.nota .icon-btn { flex: none; font-size: 11px; opacity: 0; }
+.nota:hover .icon-btn { opacity: 1; }
+
+/* ---- formulários ---- */
+
+.form { display: flex; flex-direction: column; gap: 5px; padding: 8px var(--pad) 10px; }
+
+.campo {
+  width: 100%;
+  padding: 4px 7px;
+  border: 1px solid var(--fio-forte);
+  border-radius: var(--raio);
+  background: var(--carta);
+  color: var(--ink);
+  font-size: var(--t-base);
+  outline: none;
+  resize: none;
+}
+.campo:focus { border-color: var(--neon-linha); box-shadow: var(--brilho); }
+.campo::placeholder { color: var(--ink-4); }
+.campo.area { font-family: inherit; line-height: 1.4; }
+
+.dica { margin: 0; color: var(--ink-4); font-size: var(--t-mini); }
+
+/* ==========================================================================
+   3. CABEÇALHO DA MISSÃO
+   ========================================================================== */
+
+/*
+  Os controles da direita sao a razao de existir desta barra, entao nada pode
+  empurra-los para fora da tela: o objetivo encolhe primeiro, e os botoes
+  nunca encolhem. Foi assim que o "Arquivar" desapareceu antes.
+*/
 .headline {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--gap);
   flex: none;
-  height: 40px;
-  padding: 0 12px 0 14px;
-  background: var(--bar);
-  border-bottom: 1px solid var(--rule);
+  min-height: 40px;
+  flex-wrap: wrap;
+  padding: 5px var(--pad) 5px 14px;
+  background: var(--barra);
+  border-bottom: 1px solid var(--fio);
 }
+.headline > .btn,
+.headline > .picker,
+.headline > .branch { flex: none; }
 
-.headline h1 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-}
+.headline h1 { margin: 0; font-size: 14px; font-weight: 650; letter-spacing: -0.01em; white-space: nowrap; }
 .headline h1.mudo { color: var(--ink-4); font-weight: 400; }
 
 .branch {
   padding: 1.5px 7px;
-  border: 1px solid var(--rule);
-  border-radius: 3px;
-  color: var(--ink-2);
-  font-family: var(--mono);
-  font-size: 11px;
+  border: 1px solid var(--neon-linha);
+  border-radius: var(--raio);
+  background: var(--neon-fundo);
+  color: var(--neon);
+  font-family: var(--fonte-mono);
+  font-size: var(--t-mini);
 }
 
-.spacer { flex: 1; }
+/* Missão sem worktree: o aviso é também o botão que resolve. */
+.branch.avulsa {
+  border-style: dashed;
+  border-color: var(--alerta);
+  background: none;
+  color: var(--alerta);
+  font-family: var(--fonte-ui);
+  font-size: var(--t-base);
+  cursor: pointer;
+}
+.branch.avulsa:hover:not(:disabled) { background: color-mix(in srgb, var(--alerta) 12%, transparent); }
+.branch.avulsa:disabled { opacity: 0.5; cursor: default; }
+
+.objetivo {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 44ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-3);
+  font-size: var(--t-base);
+}
 
 .picker {
   padding: 4px 6px;
-  border: 1px solid var(--rule);
-  border-radius: 3px;
-  background: var(--ground);
+  border: 1px solid var(--fio-forte);
+  border-radius: var(--raio);
+  background: var(--carta);
   color: var(--ink-2);
-  font-size: 12px;
+  font-size: var(--t-base);
   outline: none;
   cursor: pointer;
 }
-.picker:hover { color: var(--ink); }
+.picker:hover { color: var(--ink); border-color: var(--neon-linha); }
 
 .btn {
   padding: 4px 11px;
-  border: 1px solid var(--rule);
-  border-radius: 3px;
-  background: var(--ground);
+  border: 1px solid var(--fio-forte);
+  border-radius: var(--raio);
+  background: var(--carta);
   color: var(--ink-2);
-  font-size: 12px;
-  cursor: pointer;
+  font-size: var(--t-base);
   white-space: nowrap;
+  cursor: pointer;
 }
-.btn:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-4); }
+.btn:hover:not(:disabled) { color: var(--ink); border-color: var(--neon-linha); }
 .btn:disabled { opacity: 0.4; cursor: default; }
-.btn.solid { background: var(--pane); border-color: var(--pane); color: #0d1116; font-weight: 600; }
-.btn.solid:hover:not(:disabled) { filter: brightness(1.12); color: #0d1116; }
+.btn.solid {
+  background: var(--pane);
+  border-color: var(--pane);
+  color: #000;
+  font-weight: 650;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--pane) 35%, transparent);
+}
+.btn.solid:hover:not(:disabled) { filter: brightness(1.15); color: #000; }
 .btn.quiet { border-color: transparent; background: none; color: var(--ink-4); }
-.btn.quiet:hover:not(:disabled) { color: var(--ink); background: #ffffff0a; }
+.btn.quiet:hover:not(:disabled) { color: var(--ink); background: var(--neon-vidro); }
+.btn.gravando { color: var(--alerta); border-color: var(--alerta); }
 
-/* ---------- briefing do squad ---------- */
+/* ==========================================================================
+   4. BRIEFING DO TIME
+   ========================================================================== */
 
 .brief {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--gap);
   flex: none;
-  padding: 7px 12px 7px 14px;
-  background: var(--sunk);
-  border-bottom: 1px solid var(--rule);
-  font-size: 12px;
+  padding: 7px var(--pad) 7px 14px;
+  background: var(--preto);
+  border-bottom: 1px solid var(--fio);
+  font-size: var(--t-base);
 }
 
 .brief-input {
   flex: 1;
   min-width: 0;
   padding: 4px 9px;
-  border: 1px solid var(--rule);
-  border-radius: 3px;
-  background: var(--ground);
-  font-size: 12px;
+  border: 1px solid var(--fio-forte);
+  border-radius: var(--raio);
+  background: var(--carta);
+  font-size: var(--t-base);
   outline: none;
 }
-.brief-input:focus { border-color: var(--ink-4); }
+.brief-input:focus { border-color: var(--neon-linha); box-shadow: var(--brilho); }
 .brief-input::placeholder { color: var(--ink-4); }
 
 /* As fases são uma sequência real: a ordem carrega informação. */
@@ -299,16 +331,21 @@ button, select, input { font: inherit; color: inherit; }
   align-items: center;
   gap: 5px;
   padding: 2px 9px;
-  border: 1px solid var(--rule);
+  border: 1px solid var(--fio-forte);
   border-right-width: 0;
   color: var(--ink-4);
-  font-size: 11.5px;
+  font-size: var(--t-mini);
 }
-.phase:first-child { border-radius: 3px 0 0 3px; }
-.phase:last-child { border-right-width: 1px; border-radius: 0 3px 3px 0; }
-.phase.feita { color: var(--ok); }
-.phase.atual { color: var(--ink); background: #ffffff0d; font-weight: 600; }
-.phase .n { color: var(--ink-4); font-family: var(--mono); font-size: 10px; }
+.phase:first-child { border-radius: var(--raio) 0 0 var(--raio); }
+.phase:last-child { border-right-width: 1px; border-radius: 0 var(--raio) var(--raio) 0; }
+.phase.feita { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
+.phase.atual {
+  color: var(--neon);
+  background: var(--neon-fundo);
+  border-color: var(--neon-linha);
+  font-weight: 600;
+}
+.phase .n { color: inherit; opacity: 0.6; font-family: var(--fonte-mono); font-size: 10px; }
 
 .brief-texto {
   flex: 1;
@@ -319,49 +356,49 @@ button, select, input { font: inherit; color: inherit; }
   color: var(--ink-3);
 }
 
-/* ---------- aviso ---------- */
-
 .aviso {
   display: flex;
   align-items: center;
   gap: 9px;
   flex: none;
-  padding: 8px 12px 8px 14px;
-  background: #2a2114;
-  border-bottom: 1px solid #4a3a1c;
-  color: #f0d5a0;
-  font-size: 12px;
+  padding: 8px var(--pad) 8px 14px;
+  background: color-mix(in srgb, var(--alerta) 14%, #000);
+  border-bottom: 1px solid color-mix(in srgb, var(--alerta) 40%, transparent);
+  color: color-mix(in srgb, var(--alerta) 60%, #fff);
+  font-size: var(--t-base);
 }
 .aviso button { margin-left: auto; border: none; background: none; color: inherit; cursor: pointer; }
 
-/* ---------- área de trabalho ---------- */
-
-.work { display: flex; flex: 1; min-height: 0; min-width: 0; }
-.panes-wrap { display: flex; flex: 1; min-width: 0; }
-.work.dividido .panes-wrap { flex: 1 1 54%; }
+/* ==========================================================================
+   5. PAINÉIS
+   ========================================================================== */
 
 .panes {
   display: grid;
-  gap: 6px;
-  padding: 6px;
+  gap: var(--gap);
+  padding: var(--gap);
   flex: 1;
   min-height: 0;
   min-width: 0;
   grid-auto-rows: 1fr;
 }
 
-/* Painel: cartão levantado com aba na cor do agente. Sem borda. */
 .pane {
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: var(--raised);
-  border-radius: 3px;
+  background: var(--carta);
+  border: 1px solid var(--fio);
   border-top: 2px solid var(--pane);
+  border-radius: var(--raio);
   overflow: hidden;
 }
-.pane:focus-within { background: #1a212a; }
+.pane:focus-within {
+  border-color: color-mix(in srgb, var(--pane) 45%, transparent);
+  border-top-color: var(--pane);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--pane) 22%, transparent);
+}
 
 .pane-head {
   display: flex;
@@ -370,32 +407,25 @@ button, select, input { font: inherit; color: inherit; }
   flex: none;
   min-height: 30px;
   padding: 5px 8px 5px 11px;
-  border-bottom: 1px solid var(--rule-soft);
+  border-bottom: 1px solid var(--fio);
 }
 
-.who { color: var(--pane); font-size: 12px; font-weight: 650; white-space: nowrap; }
-.model { color: var(--ink-4); font-family: var(--mono); font-size: 10.5px; white-space: nowrap; }
+.who { color: var(--pane); font-size: var(--t-base); font-weight: 650; white-space: nowrap; }
+.model { color: var(--ink-4); font-family: var(--fonte-mono); font-size: 10.5px; white-space: nowrap; }
 
-/* A assinatura: forma do último minuto de saída, não só o instante atual. */
-.spark {
-  display: flex;
-  align-items: flex-end;
-  gap: 1px;
-  flex: none;
-  height: 13px;
-  width: 84px;
-  opacity: 0.85;
-}
+/* Forma do último minuto de saída, não só o instante atual. */
+.spark { display: flex; align-items: flex-end; gap: 1px; flex: none; height: 13px; width: 84px; }
 .spark i {
   display: block;
   flex: 1;
   min-height: 1px;
-  background: var(--pane);
   border-radius: 0.5px;
+  background: var(--pane);
+  box-shadow: 0 0 4px color-mix(in srgb, var(--pane) 50%, transparent);
 }
-.spark i.zero { background: var(--rule); }
+.spark i.zero { background: var(--fio-forte); box-shadow: none; }
 
-.parado { color: var(--ink-4); font-size: 11px; white-space: nowrap; }
+.parado { color: var(--ink-4); font-size: var(--t-mini); white-space: nowrap; }
 
 .meter {
   display: flex;
@@ -403,16 +433,18 @@ button, select, input { font: inherit; color: inherit; }
   gap: 6px;
   margin-left: auto;
   flex: none;
-  font-family: var(--mono);
-  font-size: 10.5px;
   color: var(--ink-3);
+  font-family: var(--fonte-mono);
+  font-size: 10.5px;
   white-space: nowrap;
 }
-.meter .custo { color: var(--ink-2); }
+.meter .custo { color: var(--ok); }
 
 .pane-term { flex: 1; min-height: 0; padding: 6px 0 0 10px; overflow: hidden; }
 
-/* ---------- editor ---------- */
+/* ==========================================================================
+   6. EDITOR
+   ========================================================================== */
 
 .editor {
   display: flex;
@@ -420,8 +452,8 @@ button, select, input { font: inherit; color: inherit; }
   flex: 1 1 46%;
   min-width: 0;
   min-height: 0;
-  background: var(--raised);
-  border-left: 1px solid var(--rule);
+  background: var(--carta);
+  border-left: 1px solid var(--fio);
 }
 
 .editor-head {
@@ -431,8 +463,8 @@ button, select, input { font: inherit; color: inherit; }
   flex: none;
   min-height: 30px;
   padding: 5px 8px 5px 12px;
-  border-bottom: 1px solid var(--rule-soft);
-  font-size: 12px;
+  border-bottom: 1px solid var(--fio);
+  font-size: var(--t-base);
 }
 
 .editor-path {
@@ -444,24 +476,26 @@ button, select, input { font: inherit; color: inherit; }
   direction: rtl;
   text-align: left;
   color: var(--ink-2);
-  font-family: var(--mono);
-  font-size: 11.5px;
+  font-family: var(--fonte-mono);
+  font-size: var(--t-mini);
 }
-.editor-path.sujo { color: var(--warn); }
+.editor-path.sujo { color: var(--alerta); }
 
 .editor-host { flex: 1; min-height: 0; overflow: hidden; }
 .editor-host .cm-editor { height: 100%; }
 
-/* ---------- régua de instrumentos ---------- */
+/* ==========================================================================
+   7. RÉGUA DE INSTRUMENTOS
+   ========================================================================== */
 
 .gauges {
   display: flex;
   align-items: center;
   flex: none;
   height: 26px;
-  background: var(--bar);
-  border-top: 1px solid var(--rule);
-  font-size: 11.5px;
+  background: var(--barra);
+  border-top: 1px solid var(--fio);
+  font-size: var(--t-mini);
 }
 
 .gauge {
@@ -470,28 +504,30 @@ button, select, input { font: inherit; color: inherit; }
   gap: 6px;
   height: 100%;
   padding: 0 12px;
-  border-right: 1px solid var(--rule-soft);
+  border-right: 1px solid var(--fio);
   color: var(--ink-3);
   line-height: 26px;
   white-space: nowrap;
 }
-.gauge b { color: var(--ink); font-weight: 600; font-family: var(--mono); font-size: 11px; }
-.gauge.alerta b { color: var(--warn); }
+.gauge b { color: var(--neon); font-family: var(--fonte-mono); font-size: var(--t-mini); font-weight: 600; }
+.gauge.alerta b { color: var(--alerta); }
 .gauge.raiz {
   margin-left: auto;
   border-right: none;
-  border-left: 1px solid var(--rule-soft);
-  color: var(--ink-4);
-  font-family: var(--mono);
-  font-size: 10.5px;
+  border-left: 1px solid var(--fio);
   max-width: 48ch;
   overflow: hidden;
   text-overflow: ellipsis;
   direction: rtl;
   text-align: left;
+  color: var(--ink-4);
+  font-family: var(--fonte-mono);
+  font-size: 10.5px;
 }
 
-/* ---------- telas vazias: convite, não decoração ---------- */
+/* ==========================================================================
+   8. TELAS VAZIAS
+   ========================================================================== */
 
 .blank {
   flex: 1;
@@ -504,13 +540,1118 @@ button, select, input { font: inherit; color: inherit; }
 }
 .blank p { margin: 0; max-width: 54ch; }
 .blank h2 { margin: 0 0 2px; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
-.blank .sub { color: var(--ink-2); font-size: 13px; }
-.blank .como { color: var(--ink-4); font-size: 12.5px; }
+.blank .sub { color: var(--ink-2); font-size: var(--t-med); }
+.blank .como { color: var(--ink-4); font-size: var(--t-base); }
+.blank strong { color: var(--neon); font-weight: 650; }
 .blank code {
   padding: 1px 5px;
   border-radius: 3px;
-  background: var(--sunk);
+  background: var(--neon-fundo);
+  color: var(--neon);
+  font-family: var(--fonte-mono);
+  font-size: var(--t-mini);
+}
+
+/* ---- ditado ---- */
+
+.btn.mic { padding: 4px 9px; }
+.btn.mic.gravando {
+  color: var(--alerta);
+  border-color: var(--alerta);
+  animation: respira 1.6s ease-in-out infinite;
+}
+
+/* Falar em português e entregar em inglês gasta menos tokens. */
+.btn.idioma {
+  padding: 4px 8px;
+  font-family: var(--fonte-mono);
+  font-size: var(--t-mini);
+  letter-spacing: 0.02em;
+}
+.btn.idioma.on {
+  color: var(--neon);
+  border-color: var(--neon-linha);
+  background: var(--neon-fundo);
+}
+
+/* ==========================================================================
+   9. CONSUMO
+   ========================================================================== */
+
+.consumo {
+  flex: none;
+  max-height: 62%;
+  overflow: auto;
+  background: var(--carta);
+  border-bottom: 1px solid var(--fio);
+}
+
+.consumo-head {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  position: sticky;
+  top: 0;
+  padding: 10px 12px 10px 14px;
+  background: var(--barra);
+  border-bottom: 1px solid var(--fio);
+}
+.consumo-head h2 { margin: 0; font-size: 14px; font-weight: 650; }
+
+.periodos { display: flex; }
+.periodo {
+  padding: 2px 9px;
+  border: 1px solid var(--fio-forte);
+  border-right-width: 0;
+  background: none;
+  color: var(--ink-4);
+  font-size: var(--t-mini);
+  cursor: pointer;
+}
+.periodo:first-child { border-radius: var(--raio) 0 0 var(--raio); }
+.periodo:last-child { border-right-width: 1px; border-radius: 0 var(--raio) var(--raio) 0; }
+.periodo.on { color: var(--neon); border-color: var(--neon-linha); background: var(--neon-fundo); }
+
+.consumo-corpo { display: flex; flex-direction: column; gap: 18px; padding: 16px 14px 18px; }
+
+.bloco { display: flex; flex-direction: column; gap: 10px; }
+.bloco-head { display: flex; align-items: baseline; gap: 9px; }
+.bloco-head h3 { margin: 0; font-size: var(--t-med); font-weight: 650; color: var(--neon); }
+.fonte { color: var(--ink-4); font-size: var(--t-mini); }
+
+.numerao { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.numerao b {
+  font-family: var(--fonte-mono);
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.numerao span { color: var(--ink-3); font-size: var(--t-base); }
+
+/* Um dia por barra: dá para ver onde o gasto se concentrou. */
+.barras {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 54px;
+  padding-top: 4px;
+}
+.barra {
+  flex: 1;
+  min-width: 2px;
+  border-radius: 1px 1px 0 0;
+  background: var(--neon);
+  opacity: 0.75;
+}
+.barra:hover { opacity: 1; box-shadow: var(--brilho-forte); }
+
+.eixo {
+  display: flex;
+  justify-content: space-between;
+  color: var(--ink-4);
+  font-family: var(--fonte-mono);
+  font-size: var(--t-nano);
+}
+
+.tabela { width: 100%; border-collapse: collapse; font-size: var(--t-base); }
+.tabela th {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--fio-forte);
+  color: var(--ink-4);
+  font-size: var(--t-mini);
+  font-weight: 600;
+  text-align: right;
+}
+.tabela th:first-child { text-align: left; }
+.tabela td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--fio);
   color: var(--ink-2);
-  font-family: var(--mono);
-  font-size: 11.5px;
+  font-family: var(--fonte-mono);
+  font-size: var(--t-mini);
+  text-align: right;
+}
+.tabela td.modelo { text-align: left; color: var(--ink); }
+.tabela td.custo { color: var(--ok); }
+.tabela tr:hover td { background: var(--neon-vidro); }
+
+.ressalva { margin: 0; max-width: 78ch; color: var(--ink-3); font-size: var(--t-base); line-height: 1.55; }
+.ressalva.rodape { color: var(--ink-4); border-top: 1px solid var(--fio); padding-top: 12px; }
+
+/* E um <button> no meio de <span>s: sem zerar o desenho padrao do navegador
+   ele aparece com fundo claro e borda propria, destoando da regua. */
+.gauge.clicavel {
+  border: none;
+  border-right: 1px solid var(--fio);
+  background: none;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: var(--t-mini);
+  cursor: pointer;
+}
+.gauge.clicavel:hover { background: var(--neon-vidro); color: var(--ink-2); }
+
+.dica.recuado { padding: 6px 10px 8px 14px; }
+
+/* ==========================================================================
+   10. PARTIDA — a primeira coisa que se ve, com uma acao so
+   ========================================================================== */
+
+.partida {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 0 40px;
+  text-align: center;
+}
+
+.partida .marca {
+  margin: 0;
+  color: var(--neon);
+  font-size: var(--t-mini);
+  font-weight: 650;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  text-shadow: var(--brilho);
+}
+
+.partida h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.botao-grande {
+  margin-top: 6px;
+  padding: 11px 30px;
+  border: 1px solid var(--neon-linha);
+  border-radius: var(--raio);
+  background: var(--neon-fundo);
+  color: var(--neon);
+  font-size: var(--t-med);
+  font-weight: 600;
+  cursor: pointer;
+}
+.botao-grande:hover:not(:disabled) {
+  background: var(--neon);
+  border-color: var(--neon);
+  color: #000;
+  box-shadow: var(--brilho);
+}
+.botao-grande:disabled { opacity: 0.4; cursor: default; }
+
+.rodape-partida { margin: 6px 0 0; max-width: 52ch; color: var(--ink-4); font-size: var(--t-base); }
+
+/* ==========================================================================
+   11. ASSISTENTE DE MISSAO
+   ========================================================================== */
+
+.wizard {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  max-height: 78%;
+  background: var(--carta);
+  border-bottom: 1px solid var(--fio);
+}
+
+.wizard-topo {
+  display: flex;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  padding: 12px 12px 12px 16px;
+  background: var(--barra);
+  border-bottom: 1px solid var(--fio);
+}
+.wizard-topo h2 { margin: 0; flex: 1; font-size: 14px; font-weight: 650; }
+
+.wizard-corpo {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+.wizard-pe {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--gap);
+  flex: none;
+  padding: 12px 16px;
+  border-top: 1px solid var(--fio);
+}
+
+.campo-bloco { display: flex; flex-direction: column; gap: 7px; }
+.rotulo { color: var(--ink-3); font-size: var(--t-mini); font-weight: 600; }
+.rotulo em { color: var(--ink-4); font-style: normal; font-weight: 400; }
+
+/* cartas de escolha: modo e time */
+.cartas { display: flex; gap: var(--gap); flex-wrap: wrap; }
+
+.carta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 200px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--fio-forte);
+  border-radius: var(--raio);
+  background: none;
+  color: var(--ink-3);
+  text-align: left;
+  cursor: pointer;
+}
+.carta:hover { border-color: var(--neon-linha); }
+.carta.on { border-color: var(--neon); background: var(--neon-fundo); box-shadow: var(--brilho); }
+.carta b { color: var(--ink); font-size: var(--t-med); font-weight: 600; }
+.carta.on b { color: var(--neon); }
+.carta span { font-size: var(--t-base); line-height: 1.4; }
+.fases-mini { color: var(--ink-4); font-family: var(--fonte-mono); font-size: var(--t-mini); }
+
+/* pilulas: quantidade e tipo de tarefa */
+.pilulas { display: flex; gap: 5px; flex-wrap: wrap; }
+
+.pilula {
+  padding: 4px 12px;
+  border: 1px solid var(--fio-forte);
+  border-radius: var(--raio);
+  background: none;
+  color: var(--ink-3);
+  font-size: var(--t-base);
+  cursor: pointer;
+}
+.pilula:hover { color: var(--ink); border-color: var(--neon-linha); }
+.pilula.on { color: var(--neon); border-color: var(--neon); background: var(--neon-fundo); }
+
+/* agentes: a cor e a identidade, entao ela lidera */
+.agentes { display: flex; gap: var(--gap); flex-wrap: wrap; }
+
+.agente {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  border: 1px solid var(--fio-forte);
+  border-radius: var(--raio);
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.agente i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cor, var(--ink-4));
+  flex: none;
+}
+.agente b { color: var(--ink-2); font-size: var(--t-base); font-weight: 600; }
+.agente span { color: var(--ink-4); font-family: var(--fonte-mono); font-size: var(--t-mini); }
+.agente:hover { border-color: var(--cor); }
+.agente.on {
+  border-color: var(--cor);
+  background: color-mix(in srgb, var(--cor) 12%, transparent);
+}
+.agente.on b { color: var(--ink); }
+
+/*
+  Elenco: uma linha por provedor. O nome liga e desliga; o ajuste so aparece
+  quando o provedor esta dentro, porque modelo e esforco de quem esta fora nao
+  significam nada. "so imagem" fica ao lado do ajuste, e nao junto do nome,
+  para nao parecer que desligar o escopo desliga o provedor.
+*/
+.elenco { display: flex; flex-direction: column; gap: 5px; }
+
+.elenco-linha {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  flex-wrap: wrap;
+  padding: 6px 10px;
+  border: 1px solid var(--fio);
+  border-radius: var(--raio);
+}
+.elenco-linha.on { border-color: var(--neon-linha); background: var(--neon-fundo); }
+
+.elenco-nome {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  min-width: 150px;
+}
+.elenco-nome i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-4);
+  flex: none;
+}
+.elenco-linha.on .elenco-nome i { background: var(--neon); }
+.elenco-linha.on .elenco-nome b { color: var(--ink); }
+.elenco-nome b { font-size: var(--t-base); font-weight: 600; }
+
+.elenco-ajuste { display: flex; align-items: center; gap: 5px; flex: 1; flex-wrap: wrap; }
+.campo.mini { width: auto; min-width: 130px; font-size: var(--t-mini); padding: 3px 6px; }
+
+.resumo {
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--fio);
+  color: var(--ink-3);
+  font-size: var(--t-base);
+}
+
+/* Tipo da tarefa no painel: mostra por que aquele modelo foi escolhido. */
+.tipo-chip {
+  flex: none;
+  padding: 0 5px;
+  border: 1px solid var(--neon-linha);
+  border-radius: var(--raio);
+  background: var(--neon-fundo);
+  color: var(--neon);
+  font-size: var(--t-nano);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   12. CONFIGURACAO DE PROVEDORES
+   ========================================================================== */
+
+.config {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  max-height: 78%;
+  background: var(--carta);
+  border-bottom: 1px solid var(--fio);
+}
+
+.lista-prov { display: flex; flex-direction: column; gap: 5px; }
+
+.prov {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--fio-forte);
+  border-radius: var(--raio);
+}
+
+/* A luz diz o que importa: o comando existe nesta maquina? */
+.prov-luz {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-4);
+}
+.prov.on .prov-luz { background: var(--ok); box-shadow: 0 0 7px var(--ok); }
+
+.prov-corpo { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.prov-corpo b { color: var(--ink); font-size: var(--t-med); font-weight: 600; }
+
+.prov-cmd,
+.prov-agentes,
+.prov-instalar,
+.prov-teste {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--t-mini);
+}
+.prov-cmd { color: var(--ink-3); font-family: var(--fonte-mono); }
+.prov-agentes { color: var(--ink-4); }
+.prov-instalar { color: var(--alerta); }
+.prov-teste { font-family: var(--fonte-mono); }
+.prov-teste.ok { color: var(--ok); }
+.prov-teste.falhou { color: var(--alerta); }
+
+.form-inline { display: flex; flex-direction: column; gap: 5px; max-width: 460px; }
+.form-acoes { display: flex; justify-content: flex-end; gap: var(--gap); }
+
+.carta code,
+.prov-instalar code,
+.ressalva code {
+  padding: 0 4px;
+  border-radius: 2px;
+  background: var(--neon-fundo);
+  color: var(--neon);
+  font-family: var(--fonte-mono);
+  font-size: var(--t-mini);
+}
+
+/* Independent windows leave the terminal workspace at its original size. */
+.modal-window {
+  width: min(800px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  margin: auto;
+  border: 1px solid #34445d;
+  border-radius: 12px;
+  background: var(--carta);
+  color: var(--ink);
+  box-shadow: 0 24px 90px #000b;
+  overflow: hidden;
+}
+.modal-window::backdrop { background: #02050bcc; }
+.modal-window > .wizard,
+.modal-window > .config,
+.modal-window > .consumo {
+  max-height: calc(100dvh - 50px);
+  border-bottom: 0;
+}
+.modal-window .wizard-topo,
+.modal-window .consumo-head { flex-shrink: 0; }
+@media (max-width: 600px) {
+  .modal-window { width: calc(100vw - 16px); max-height: calc(100dvh - 24px); }
+  .modal-window > .wizard,
+  .modal-window > .config,
+  .modal-window > .consumo { max-height: calc(100dvh - 26px); }
+}
+
+
+/* ==========================================================================
+   13. ACABAMENTO — o terminal é o produto
+
+   Regra desta seção: cada pixel gasto com moldura é um pixel a menos de
+   terminal. Existe UMA barra de comando (.headline) e UMA régua embaixo
+   (.gauges). Nada de segunda barra de título, nada de barra só para dizer
+   quantos painéis existem — isso se conta olhando.
+   ========================================================================== */
+
+:root { color-scheme: dark; }
+button { touch-action: manipulation; }
+svg { flex-shrink: 0; vertical-align: middle; }
+* { scrollbar-width: thin; scrollbar-color: #2b3442 transparent; }
+:focus-visible { outline: 1px solid var(--neon); outline-offset: 2px; }
+
+/* ---- a barra única ---- */
+
+.headline {
+  min-height: 34px;
+  flex-wrap: nowrap;
+  gap: 7px;
+  padding: 0 6px 0 4px;
+  background: var(--barra);
+}
+.headline h1 {
+  font-size: 12.5px;
+  font-weight: 600;
+  max-width: 26ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.headline h1.mudo { font-weight: 500; color: var(--ink-3); }
+.headline .objetivo {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ink-4);
+  font-size: var(--t-mini);
+}
+.headline .sep { flex: none; width: 1px; height: 16px; background: var(--fio); margin: 0 1px; }
+.btn, .picker { min-height: 24px; padding: 2px 8px; font-size: var(--t-mini); }
+.picker { max-width: 190px; }
+.btn.solid { background: var(--neon); border-color: var(--neon); color: #000; font-weight: 600; }
+.btn.solid:hover:not(:disabled) { color: #000; box-shadow: var(--brilho); }
+.branch { font-size: 10px; padding: 1px 6px; }
+
+.icon-btn {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 24px;
+  min-height: 24px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--ink-4);
+  cursor: pointer;
+}
+.icon-btn:hover:not(:disabled) { background: var(--neon-vidro); color: var(--neon); }
+
+/* Seletor de colunas: quatro toques, sem rótulo — a grade responde na hora. */
+.cols { display: flex; flex: none; gap: 1px; padding: 1px; border-radius: 4px; background: var(--fio); }
+.cols button {
+  min-width: 20px;
+  height: 20px;
+  border: 0;
+  background: var(--barra);
+  color: var(--ink-4);
+  font-family: var(--fonte-mono);
+  font-size: 10px;
+  cursor: pointer;
+}
+.cols button:first-child { border-radius: 3px 0 0 3px; }
+.cols button:last-child { border-radius: 0 3px 3px 0; }
+.cols button:hover { color: var(--ink-2); }
+.cols button.on { background: var(--neon-fundo); color: var(--neon); }
+
+/* Conectado é o normal: vira um ponto. Só fala quando dá problema. */
+.connection { display: flex; align-items: center; gap: 5px; flex: none; white-space: nowrap; font-size: 10px; color: var(--alerta); }
+.connection i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.connection.connected { color: var(--ok); }
+.connection.connected i { box-shadow: 0 0 6px color-mix(in srgb, var(--ok) 55%, transparent); }
+
+/* ---- barra lateral ---- */
+
+
+/* ---- a grade de terminais ----
+
+   Sem cantos, sem gap: os painéis se encostam e o vão de 1px vira a divisa,
+   como num multiplexer. A cor do agente fica só no fio de cima e no nome —
+   é a única cor por painel, e é o que deixa localizar cada um de relance.
+   O último painel de uma fileira incompleta se estica: buraco preto ao lado
+   de um terminal é espaço roubado do trabalho.                            */
+
+.work { background: var(--fio); }
+.panes-wrap { min-height: 0; }
+.panes {
+  grid-template-columns: var(--columns);
+  gap: 1px;
+  padding: 0;
+  background: var(--fio);
+  grid-auto-rows: minmax(150px, 1fr);
+  overflow: auto;
+}
+.panes[data-colunas="2"] > .pane:last-child:nth-child(2n-1) { grid-column: span 2; }
+.panes[data-colunas="3"] > .pane:last-child:nth-child(3n-2) { grid-column: span 3; }
+.panes[data-colunas="3"] > .pane:last-child:nth-child(3n-1) { grid-column: span 2; }
+
+.pane { border: 0; border-top: 2px solid var(--pane); border-radius: 0; }
+.pane:focus-within { border-top-color: var(--pane); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pane) 28%, transparent); }
+
+.pane-head {
+  min-height: 22px;
+  gap: 7px;
+  padding: 0 3px 0 8px;
+  flex-wrap: nowrap;
+  background: var(--carta);
+  border-bottom: 1px solid var(--fio);
+}
+.pane-head .luz { flex: none; width: 5px; height: 5px; border-radius: 50%; background: var(--pane); }
+.pane-head .luz.parada { background: none; box-shadow: inset 0 0 0 1px var(--fio-forte); }
+.pane-head .who { font-size: var(--t-mini); font-weight: 650; letter-spacing: 0.01em; }
+.pane-head .model {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 10px;
+}
+.pane-head .spark { flex: none; width: 40px; height: 10px; }
+.pane-head .spark i { box-shadow: none; }
+.pane-head .meter { margin: 0; font-size: 10px; color: var(--ok); }
+/* O ✕ só aparece quando a mão está no painel: fechar é raro, ver é constante. */
+.pane-head .fechar { min-width: 18px; min-height: 18px; opacity: 0; font-size: 10px; }
+.pane:hover .fechar, .pane:focus-within .fechar { opacity: 1; }
+.pane-head .fechar:hover { color: var(--alerta); background: none; }
+
+.pane-term { padding: 3px 0 0 7px; }
+
+/* ---- editor ---- */
+
+.editor { margin: 0; border: 0; border-left: 1px solid var(--fio); border-radius: 0; overflow: hidden; }
+.editor-head { background: var(--carta); min-height: 26px; }
+
+/* ---- régua de baixo ---- */
+
+.gauges { height: 22px; overflow-x: auto; background: var(--barra); font-family: var(--fonte-mono); }
+.gauge { padding: 0 9px; line-height: 21px; font-size: 10px; }
+.gauge b { font-size: 10px; }
+
+/* ---- telas vazias: uma frase, um botão ---- */
+
+.partida { flex: 1; gap: 12px; padding: 0 32px; background: none; }
+.partida h2 { font-size: 15px; font-weight: 550; letter-spacing: 0; color: var(--ink-2); }
+.botao-grande { margin-top: 0; min-height: 30px; padding: 6px 18px; font-size: var(--t-base); border-radius: 5px; }
+.rodape-partida { margin: 2px 0 0; max-width: 46ch; font-size: var(--t-mini); line-height: 1.6; }
+.rodape-partida strong { color: var(--neon); font-weight: 600; }
+
+/* ---- briefing do time ---- */
+
+.brief { padding: 5px 8px; flex-wrap: wrap; background: var(--preto); }
+.brief-input { min-height: 26px; }
+.phases { flex-wrap: wrap; row-gap: 4px; }
+
+/* ---- janelas ---- */
+
+.wizard, .config, .consumo { min-height: 0; }
+.wizard-corpo { background: var(--carta); gap: 16px; padding: 16px; }
+.campo { padding: 6px 9px; }
+.carta { padding: 12px; background: var(--carta); }
+.carta.on { box-shadow: inset 0 0 0 1px var(--neon-linha); }
+
+@media (max-width: 1100px) {
+  .lateral { width: 190px; }
+  .headline .objetivo { display: none; }
+  .work.dividido { flex-direction: column; }
+  .work.dividido .panes-wrap { flex: 1 1 50%; }
+  .editor { flex: 1 1 50%; border-left: 0; border-top: 1px solid var(--fio); }
+}
+
+@media (max-width: 760px) {
+  .deck { position: relative; }
+  .lateral { position: absolute; z-index: 10; inset: 0 auto 0 0; width: 230px; box-shadow: 14px 0 36px #000a; }
+  .headline .branch, .headline .cols, .headline .sep { display: none; }
+  .picker { max-width: 130px; }
+  .panes { grid-template-columns: 1fr !important; }
+  .panes > .pane { grid-column: auto !important; }
+  .gauges .gauge.raiz { display: none; }
+}
+
+/* ==========================================================================
+   14. AJUSTES — provedores, marketplace, skills, receitas, media
+
+   Tudo aqui é lista longa: 105 skills, 289 plugins. A regra é a mesma dos
+   terminais — a linha carrega só o que se lê de relance, e o detalhe abre
+   quando pedido. Nada de cartão gordo repetido trezentas vezes.
+   ========================================================================== */
+
+.ajustes { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+
+.abas {
+  display: flex;
+  gap: 2px;
+  flex: none;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--fio);
+  background: var(--barra);
+}
+.aba {
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--ink-4);
+  font-size: var(--t-base);
+  cursor: pointer;
+}
+.aba:hover { color: var(--ink-2); }
+.aba.on { color: var(--neon); border-bottom-color: var(--neon); }
+
+.aba-corpo { position: relative; display: flex; flex-direction: column; min-height: 0; flex: 1; overflow: auto; }
+.aba-corpo > .config { display: contents; }
+
+.barra-acervo { display: flex; align-items: center; gap: 8px; flex: none; }
+.barra-acervo .campo { flex: 1; min-width: 0; }
+.barra-acervo .picker { flex: none; }
+.dica.sem-margem { margin: 0; }
+.campo-bloco.cresce { flex: 1; min-height: 0; }
+.form-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+
+/* ---- acervo de skills ---- */
+
+.lista-skills {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-height: 0;
+  border: 1px solid var(--fio);
+  border-radius: var(--raio);
+  background: var(--fio);
+  overflow: auto;
+  max-height: 46vh;
+}
+
+.skill { display: flex; align-items: center; gap: 8px; padding: 0 8px; background: var(--carta); }
+/* Carregada pelo agente escolhido: o fio à esquerda é a resposta visual. */
+.skill.carrega { box-shadow: inset 2px 0 0 var(--neon); }
+.skill input[type="checkbox"] { flex: none; accent-color: var(--neon); cursor: pointer; }
+
+.skill-toque {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+  padding: 7px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.skill-toque b { flex: none; font-size: var(--t-base); font-weight: 600; }
+.skill-toque:hover b { color: var(--neon); }
+.skill-desc {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ink-4);
+  font-size: var(--t-mini);
+}
+.skill-origem {
+  flex: none;
+  color: var(--ink-4);
+  font-family: var(--fonte-mono);
+  font-size: 10px;
+}
+.skill .apagar { opacity: 0; }
+.skill:hover .apagar, .skill:focus-within .apagar { opacity: 1; }
+
+.corpo-skill { min-height: 220px; font-family: var(--fonte-mono); font-size: var(--t-mini); line-height: 1.6; resize: vertical; }
+
+.painel-agente {
+  flex: none;
+  padding: 9px 11px;
+  border: 1px solid var(--neon-linha);
+  border-radius: var(--raio);
+  background: var(--neon-vidro);
+}
+.linha-agente { display: flex; align-items: center; gap: 9px; }
+.linha-agente .btn.on { border-color: var(--alerta); color: var(--alerta); }
+.painel-agente .dica { margin: 6px 0 0; }
+
+/* Leitor da skill: sobrepõe a lista, porque ler é uma coisa de cada vez. */
+.leitor {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  background: var(--preto);
+}
+.leitor > header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: none;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--fio);
+}
+.leitor pre {
+  flex: 1;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  color: var(--ink-2);
+  font-family: var(--fonte-mono);
+  font-size: var(--t-mini);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+/* ---- marketplace ---- */
+
+.plugin { display: flex; flex-direction: column; gap: 5px; padding: 9px 10px; background: var(--carta); }
+.plugin-topo { display: flex; align-items: center; gap: 8px; }
+.plugin-topo b { font-size: var(--t-base); font-weight: 600; }
+/* Já em disco: dá para ver o conteúdo. O resto ainda é só um nome. */
+.plugin.baixado .plugin-topo b { color: var(--neon); }
+.plugin-desc {
+  margin: 0;
+  max-width: 92ch;
+  color: var(--ink-4);
+  font-size: var(--t-mini);
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.plugin-skills { display: flex; flex-wrap: wrap; gap: 4px; }
+
+.chip-skill {
+  padding: 2px 7px;
+  border: 1px solid var(--fio-forte);
+  border-radius: 4px;
+  background: none;
+  color: var(--ink-3);
+  font-size: 10px;
+  cursor: pointer;
+}
+.chip-skill:hover:not(:disabled) { border-color: var(--neon); color: var(--neon); }
+.chip-skill.on { border-color: transparent; background: var(--neon-fundo); color: var(--neon); cursor: default; }
+.chip-skill:disabled { cursor: default; }
+
+.tipo-chip.mcp { border-color: var(--ok); color: var(--ok); }
+.aviso.ok { border-color: var(--ok); color: var(--ok); }
+
+/* ---- receitas ---- */
+
+.grade-receitas { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+
+.receita {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--fio);
+  border-radius: var(--raio);
+  background: var(--carta);
+}
+.receita-topo { display: flex; align-items: center; gap: 7px; }
+.receita-topo b { font-size: var(--t-base); font-weight: 600; }
+.receita-desc { margin: 0; color: var(--ink-3); font-size: var(--t-mini); line-height: 1.55; }
+.receita-pecas { display: flex; flex-wrap: wrap; gap: 4px; }
+.receita-pecas span {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--barra);
+  color: var(--ink-4);
+  font-family: var(--fonte-mono);
+  font-size: 10px;
+}
+/* O tipo é a peça que decide modelo e esforço: é a que merece a cor. */
+.receita-pecas .peca-tipo { background: var(--neon-fundo); color: var(--neon); }
+.receita .apagar { opacity: 0; }
+.receita:hover .apagar { opacity: 1; }
+
+.receitas-linha { max-height: 30vh; overflow: auto; }
+
+/* Campo que a receita já respondeu. */
+.resolvido {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: none;
+  padding: 6px 10px;
+  border: 1px solid var(--fio);
+  border-left: 2px solid var(--neon);
+  border-radius: var(--raio);
+  background: var(--carta);
+}
+.resolvido .rotulo { flex: none; margin: 0; }
+.resolvido b { font-size: var(--t-base); }
+
+/* ---- media ---- */
+
+.resumo-media { display: flex; gap: 12px; align-items: baseline; }
+.resumo-media > span { color: var(--ink-4); font-size: var(--t-mini); }
+.resumo-media > span.on { color: var(--ink-2); }
+.resumo-media b { color: var(--ink-4); font-family: var(--fonte-mono); }
+.resumo-media > span.on b { color: var(--ok); }
+
+.linha-modelo { display: flex; align-items: center; gap: 7px; margin-top: 3px; color: var(--ink-4); font-size: var(--t-mini); }
+.form-inline.chave { flex: none; width: min(340px, 46%); }
+.form-inline.chave .campo { font-family: var(--fonte-mono); }
+.prov-instalar code { word-break: break-all; }
+
+@media (max-width: 760px) {
+  .abas { overflow-x: auto; }
+  .barra-acervo { flex-wrap: wrap; }
+  .form-inline.chave { width: 100%; }
+  .grade-receitas { grid-template-columns: 1fr; }
+}
+
+/* Ajustes é lista longa e densa: cabe mais e vale a altura toda. */
+.modal-window:has(> .ajustes) { width: min(1060px, calc(100vw - 32px)); }
+.modal-window > .ajustes { height: min(760px, calc(100dvh - 50px)); }
+.ajustes .wizard-corpo { flex: 1; min-height: 0; overflow: auto; }
+.ajustes .lista-skills { max-height: none; flex: 1; }
+
+/* ==========================================================================
+   15. UMA BARRA, UMA JANELA
+
+   A barra lateral permanente virou dois botões. Projetos e missões abrem numa
+   janela; arquivos e memória num painel que você fecha. O que sobra da tela é
+   terminal — que é o produto.
+
+   Uma paleta só: preto e o azul do --neon. Nenhuma cor nova entra aqui; as
+   dos agentes (--pane) são a exceção, e existem para você distinguir painel.
+   ========================================================================== */
+
+/* ---- o botão que abre projetos e missões ---- */
+
+.btn.projeto {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  max-width: 22ch;
+  border-color: var(--fio-forte);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.btn.projeto:hover { border-color: var(--neon-linha); color: var(--neon); }
+.btn.projeto svg { color: var(--neon); }
+
+.fio-v { flex: none; width: 1px; height: 15px; background: var(--fio); }
+.icon-btn.on { background: var(--neon-fundo); color: var(--neon); }
+
+/* ---- painel de arquivos e memória ---- */
+
+.lateral {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  width: 232px;
+  min-height: 0;
+  background: var(--preto);
+  border-right: 1px solid var(--fio);
+}
+.lateral .abas { padding: 0 4px 0 6px; }
+.lateral .aba { padding: 6px 8px; font-size: var(--t-mini); }
+.lateral-corpo { flex: 1; min-height: 0; overflow: auto; padding-bottom: 8px; }
+
+.aba .count {
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--neon-fundo);
+  color: var(--neon);
+  font-family: var(--fonte-mono);
+  font-size: var(--t-nano);
+}
+
+/* ---- linhas de projeto e de missão ----
+
+   A mesma linha serve para as duas coisas, porque escolher projeto e escolher
+   missão é a mesma decisão em degraus diferentes. O ✕ só aparece no hover:
+   apagar é raro, escolher é constante.                                     */
+
+.lista-skills.curta { max-height: 26vh; flex: none; }
+
+.linha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px 0 8px;
+  background: var(--carta);
+}
+.linha.on { box-shadow: inset 2px 0 0 var(--neon); }
+.linha.on b { color: var(--neon); }
+
+.linha-toque {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.linha-toque svg { flex: none; align-self: center; color: var(--ink-4); }
+.linha-toque b { flex: none; font-size: var(--t-base); font-weight: 600; }
+.linha-toque:hover b { color: var(--neon); }
+.linha .caminho {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ink-4);
+  font-size: var(--t-mini);
+}
+.linha .apagar { opacity: 0; }
+.linha:hover .apagar, .linha:focus-within .apagar { opacity: 1; }
+.linha .apagar:hover:not(:disabled) { color: var(--alerta); background: none; }
+.linha.confirma { gap: 7px; padding: 7px 8px; background: var(--neon-vidro); flex-wrap: wrap; }
+.linha.confirma .nome { flex: none; font-size: var(--t-base); font-weight: 600; }
+
+/* Título de uma janela sem abas — mesma altura da barra de abas. */
+.aba-titulo {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 4px 8px 6px;
+  color: var(--ink-2);
+  font-size: var(--t-base);
+  font-weight: 600;
+}
+.aba-titulo svg { color: var(--neon); }
+
+.modal-window:has(> .ajustes) .rotulo { display: flex; align-items: center; gap: 9px; }
+.modal-window:has(> .ajustes) .rotulo .btn { margin-left: auto; }
+
+/* ---- tela inicial: um botão, e mais nada ---- */
+
+.partida h2 { font-size: 16px; }
+.cockpit:not(:has(.headline h1)) .gauges .gauge:not(.raiz) { display: none; }
+
+@media (max-width: 760px) {
+  .btn.projeto { max-width: 12ch; }
+  .headline .idioma { display: none; }
+}
+
+/* Janela sem abas: encolhe até o conteúdo em vez de esticar até o teto. */
+.modal-window > .ajustes.janela { height: auto; max-height: min(720px, calc(100dvh - 50px)); }
+.ajustes.janela .lista-skills { max-height: 44vh; }
+
+/* O cinza das divisas é para os vãos entre terminais, não para o fundo. */
+.work { background: var(--preto); }
+.panes { background: var(--fio); }
+
+/* Sem projeto não há o que medir: a régua some em vez de virar faixa vazia. */
+.cockpit:not(:has(.panes-wrap)) .gauges,
+.gauges:not(:has(.gauge)) { display: none; }
+
+/* Assinatura contra chave de API: a diferença que mais importa nesta tela. */
+.pago-assinatura { color: var(--ok); font-weight: 600; }
+.pago-chave { color: var(--alerta); font-weight: 600; }
+
+/* ---- redline: cota das assinaturas, no rodapé ----
+
+   Cada provedor conta de um jeito. Onde não há número o valor é "?", e a cor
+   diz o resto: verde livre, âmbar apertado, vermelho bloqueado, cinza sem
+   dado. Cinza NÃO é verde — é a distinção que impede você de confiar no
+   painel e levar o bloqueio no meio do trabalho.                          */
+
+.redline { display: flex; align-items: center; flex: none; height: 100%; }
+.cota {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+  padding: 0 9px;
+  border-right: 1px solid var(--fio);
+  color: var(--ink-4);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.cota i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.cota b { font-family: var(--fonte-mono); font-weight: 600; }
+.cota em { font-style: normal; opacity: 0.75; }
+.cota.livre { color: var(--ok); }
+.cota.apertado { color: var(--alerta); }
+.cota.bloqueado { color: #e0574a; }
+.cota.desconhecido { color: var(--ink-4); }
+.cota.desconhecido i { background: none; box-shadow: inset 0 0 0 1px var(--fio-forte); }
+
+.elenco-selo { color: var(--ink-3); border-color: var(--fio-forte); }
+
+/* A tela de tombo: aparece no lugar do preto quando o render falha. */
+.tombo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 620px;
+  margin: 80px auto;
+  padding: 0 24px;
+}
+.tombo h1 { margin: 0; font-size: 18px; color: var(--ink); }
+.tombo pre {
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--fio-forte);
+  border-radius: var(--raio);
+  background: var(--carta);
+  color: var(--ink-2);
+  font-family: var(--fonte-mono);
+  font-size: var(--t-mini);
+  white-space: pre-wrap;
 }

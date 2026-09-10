@@ -1,7 +1,15 @@
 import { spawn, type IPty } from "node-pty";
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { config, ROOT, type AgentSpec } from "./config.ts";
+import { fileURLToPath } from "node:url";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { config, type AgentSpec, type Elenco } from "./config.ts";
+import { CASA, lerMemoria, type Nota } from "./state.ts";
+import { confiar } from "./confianca.ts";
+import { definirModelo } from "./agy.ts";
+import { resolverHarness, type Pedido } from "./harness.ts";
+import { indiceParaPrompt, skillsDoAgente } from "./skills.ts";
 
 export type PaneStatus = "run" | "idle" | "dead";
 
@@ -11,9 +19,15 @@ export type PaneState = {
   label: string;
   cor: string;
   cli: string;
+  /** O que o harness resolveu de verdade, não o padrão do catálogo. */
+  model: string | null;
+  effort: string | null;
+  tipo: string | null;
   cwd: string;
+  projectId: string | null;
   missionId: string | null;
   sessionId: string | null;
+  maestro: boolean;
   status: PaneStatus;
   bytesIn: number;
   bytesOut: number;
@@ -31,67 +45,265 @@ let counter = 0;
 const OCIOSO_APOS = 2000;
 const JANELA = 60;
 
+const MCP_SCRIPT = fileURLToPath(new URL("./mcp-maestro.ts", import.meta.url));
+
 function agentSpec(agent: string): AgentSpec {
-  return (
-    config.agents[agent] ?? { label: agent.toUpperCase(), cor: "#6b7280", cli: agent }
-  );
+  const spec = config.agents[agent];
+  // Um nome inventado tem que virar erro: o maestro precisa saber que errou,
+  // não ganhar um painel rodando um comando que não existe.
+  if (!spec) {
+    throw new Error(
+      `não existe agente "${agent}". Disponíveis: ${Object.keys(config.agents).join(", ")}`,
+    );
+  }
+  return spec;
 }
 
-// No Windows um CLI costuma ser um shim .cmd/.ps1, que o conpty só consegue
-// lançar através do processador de comandos.
-function resolveCli(cli: string, extra: string[]): { file: string; args: string[] } {
+const executaveis = new Map<string, string | null>();
+
+/**
+ * No Windows, passar por `cmd.exe /c` faz o processador de comandos reparsear
+ * os argumentos — aspas e JSON chegam despedaçados no CLI. Quando existe um
+ * .exe de verdade no PATH, lançamos ele direto e o problema some. O cmd fica
+ * só como último recurso, para shims .cmd/.ps1.
+ */
+function acharExe(comando: string): string | null {
+  if (!executaveis.has(comando)) {
+    let achado: string | null = null;
+    try {
+      const linhas = execFileSync("where", [comando], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).split(/\r?\n/);
+      achado = linhas.find((l) => l.trim().toLowerCase().endsWith(".exe"))?.trim() ?? null;
+    } catch {
+      achado = null;
+    }
+    executaveis.set(comando, achado);
+  }
+  return executaveis.get(comando) ?? null;
+}
+
+export function resolveCli(cli: string, extra: string[]): { file: string; args: string[] } {
   const spec = config.clis[cli] ?? { command: cli };
   const args = [...(spec.args ?? []), ...extra];
   if (process.platform !== "win32") return { file: spec.command, args };
   if (/[\\/]/.test(spec.command) || spec.command.toLowerCase().endsWith(".exe")) {
     return { file: spec.command, args };
   }
+  const exe = acharExe(spec.command);
+  if (exe) return { file: exe, args };
   const comspec = process.env.ComSpec ?? "cmd.exe";
   return { file: comspec, args: ["/c", spec.command, ...args] };
 }
 
-/** Monta os argumentos do harness a partir do perfil do agente. */
-function harness(spec: AgentSpec): { args: string[]; sessionId: string | null } {
-  const args = [...(spec.args ?? [])];
-  let sessionId: string | null = null;
-  if (spec.cli === "claude") {
-    sessionId = randomUUID();
-    args.push("--session-id", sessionId);
-    if (spec.model) args.push("--model", spec.model);
-    if (spec.effort) args.push("--effort", spec.effort);
+const memoriaDo = (projectId: string | null): Nota[] =>
+  projectId ? lerMemoria(projectId) : [];
+
+/**
+ * O elenco vira texto: o agente precisa saber que não adianta pedir para o
+ * Gemini escrever a página, porque o cockpit não vai abrir esse painel.
+ */
+export function notaDoElenco(elenco: Elenco | undefined): string {
+  if (!elenco || elenco.clis.length === 0) return "";
+  const nome = (cli: string) =>
+    ({ claude: "Claude", codex: "GPT (Codex)", agy: "Gemini (Antigravity)", bash: "terminal" })[cli] ?? cli;
+  const soVisual = new Set(elenco.soVisual ?? []);
+  const linhas = elenco.clis.map((cli) => {
+    const fixo = elenco.porCli?.[cli];
+    const fixado = fixo?.model ? ` — fixado em ${fixo.model}${fixo.effort ? `/${fixo.effort}` : ""}` : "";
+    const escopo = soVisual.has(cli)
+      ? " — SÓ para produzir arquivos de imagem, vídeo e áudio que vão dentro do produto"
+      : "";
+    return `- ${nome(cli)}${fixado}${escopo}`;
+  });
+  const barrados = elenco.clis.filter((c) => soVisual.has(c)).map(nome);
+  const regra = barrados.length
+    ? `\n${barrados.join(" e ")} entrega ARQUIVO, não desenho de tela: foto, ilustração, ícone, textura, render de objeto. Layout, tipografia, hierarquia e aparência da interface são decididos e escritos em código por quem constrói — não peça mockup de tela para copiar depois. Peça a imagem com o uso e o tamanho, e siga você mesmo com o código.`
+    : "";
+  const cabecalho = "IAs liberadas nesta missão — o cockpit não abre painel fora desta lista:";
+  return `${cabecalho}\n${linhas.join("\n")}${regra}`;
+}
+
+/** Papel + skills + objetivo da missão + o que o projeto já aprendeu. */
+function systemPrompt(
+  agentId: string,
+  spec: AgentSpec,
+  objetivo: string,
+  memoria: Nota[],
+  skillsDaMissao: string[] = [],
+  elenco?: Elenco,
+): string {
+  const solo = config.politicaIA?.modo === "unica";
+  const papel = solo && spec.maestro
+    ? "Você é o maestro e executor desta missão. Planeje, implemente, revise e teste pessoalmente de ponta a ponta. Só delegue se o usuário pedir divisão; todos os papéis usam a mesma IA. Salve checkpoints e decisões com as ferramentas do cockpit."
+    : spec.papel ?? "";
+  const partes = [papel, config.instrucoesGerais ?? ""];
+  const indice = indiceParaPrompt(skillsDoAgente(agentId, spec, skillsDaMissao));
+  if (indice) partes.push(indice);
+  partes.push(`Execução atual: CLI ${spec.cli}, modelo ${spec.model ?? "padrão"}, esforço ${spec.effort ?? "padrão"}. Esta configuração prevalece sobre referências a provedores no texto do papel. Preserve a responsabilidade do agente mesmo em uma troca de provedor.`);
+  const nota = notaDoElenco(config.politicaIA?.modo === "unica" ? undefined : elenco);
+  if (nota) partes.push(nota);
+  if (objetivo) partes.push(`Objetivo desta missão: ${objetivo}`);
+  if (memoria.length > 0) {
+    const recentes = memoria.slice(-20).map((n) => `- (${n.quem}) ${n.texto}`);
+    partes.push(
+      `Memória compartilhada do projeto — o que os agentes anteriores registraram:\n${recentes.join("\n")}`,
+    );
   }
-  return { args, sessionId };
+  return partes.filter(Boolean).join("\n\n");
+}
+
+export type SpawnOpts = {
+  agent: string;
+  /** Tipo da tarefa e overrides: o harness resolve cli, modelo e effort. */
+  harness?: Omit<Pedido, "agent">;
+  cwd: string;
+  projectId: string | null;
+  missionId: string | null;
+  objetivo?: string;
+  /** Skills que a missão pediu, além das do agente. */
+  skills?: string[];
+  /** Primeira mensagem do painel. Vai como argumento, não digitada. */
+  tarefa?: string;
+  porta: number;
+};
+
+/**
+ * O cockpit pode ter sido iniciado de dentro de outra sessão do Claude Code.
+ * Esses marcadores herdados desligam a gravação de sessão do filho — e sem
+ * gravação não há como medir tokens nem custo.
+ */
+function ambienteLimpo(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env, TERM: "xterm-256color" };
+  for (const chave of Object.keys(env)) {
+    if (chave.startsWith("CLAUDE_CODE_") || chave === "CLAUDECODE") delete env[chave];
+  }
+  return env;
 }
 
 export function spawnPane(
-  agent: string,
-  cwd: string,
-  missionId: string | null,
+  opts: SpawnOpts,
   onOutput: (data: string) => void,
   onExit: (code: number) => void,
 ): PaneState {
-  const spec = agentSpec(agent);
-  const { args, sessionId } = harness(spec);
+  const perfil = agentSpec(opts.agent);
+  // O tipo da tarefa manda no modelo e no effort; o agente entra com papel e cor.
+  const bundle = resolverHarness({ agent: opts.agent, ...(opts.harness ?? {}) });
+  const spec: AgentSpec = { ...perfil, cli: bundle.cli, model: bundle.model, effort: bundle.effort };
+  const args: string[] = [...(spec.args ?? [])];
+  let sessionId: string | null = null;
+  const maestro = spec.maestro === true;
+
+  // Sem isto, cada worktree novo trava o painel no diálogo de confiança do CLI.
+  if (config.confiarNasPastasQueEuAbrir !== false) confiar(spec.cli, opts.cwd);
+
+  if (spec.cli === "claude") {
+    sessionId = randomUUID();
+    if (spec.model) args.push("--model", spec.model);
+    if (spec.effort) args.push("--effort", spec.effort);
+
+    // Só o maestro ganha as alavancas do cockpit; os especialistas trabalham.
+    // --strict-mcp-config deixa de fora os servidores MCP pessoais: sem
+    // pedidos de autenticação e sem a demora que eles somam na subida.
+    // A configuração vai em arquivo: JSON em linha de comando não sobrevive
+    // ao caminho do Windows.
+    if (maestro && opts.missionId) {
+      const caminho = join(CASA, "mcp", `${opts.missionId}.json`);
+      mkdirSync(dirname(caminho), { recursive: true });
+      writeFileSync(
+        caminho,
+        JSON.stringify({
+          mcpServers: {
+            cockpit: {
+              command: process.execPath,
+              args: [MCP_SCRIPT],
+              env: {
+                COCKPIT_PORT: String(opts.porta),
+                COCKPIT_MISSION: opts.missionId,
+                COCKPIT_PROJECT: opts.projectId ?? "",
+                COCKPIT_AGENT: spec.label,
+              },
+            },
+          },
+        }),
+      );
+      args.push("--strict-mcp-config", "--mcp-config", caminho);
+    }
+
+    // --mcp-config é variádico: engole tudo até a próxima flag, inclusive o
+    // prompt posicional. Estas duas opções, de valor único, fecham a lista e
+    // por isso ficam sempre por último.
+    const prompt = systemPrompt(opts.agent, spec, opts.objetivo ?? "", memoriaDo(opts.projectId), opts.skills, opts.harness?.elenco);
+    if (prompt) args.push("--append-system-prompt", prompt);
+    args.push("--session-id", sessionId);
+  }
+
+  // A Antigravity não tem system prompt por flag, então papel, objetivo e
+  // memória entram no começo da própria tarefa.
+  let tarefa = opts.tarefa;
+  if (spec.cli === "agy") {
+    // A flag só vale em modo print; a sessão interativa lê as preferências.
+    definirModelo(spec.model);
+    if (spec.model) args.push("--model", spec.model);
+    if (spec.effort) args.push("--effort", spec.effort);
+    const prompt = systemPrompt(opts.agent, spec, opts.objetivo ?? "", memoriaDo(opts.projectId), opts.skills, opts.harness?.elenco);
+    if (prompt) tarefa = tarefa ? `${prompt}\n\n---\n\n${tarefa}` : prompt;
+  }
+
+  if (spec.cli === "codex") {
+    if (spec.model) args.push("--model", spec.model);
+    if (spec.effort) args.push("-c", `model_reasoning_effort=${JSON.stringify(spec.effort)}`);
+    if (maestro && opts.missionId) {
+      args.push("-c", `mcp_servers.cockpit.command=${JSON.stringify(process.execPath.replaceAll("\\", "/"))}`);
+      args.push("-c", `mcp_servers.cockpit.args=${JSON.stringify([MCP_SCRIPT.replaceAll("\\", "/")])}`);
+      for (const [key, value] of Object.entries({ COCKPIT_PORT: String(opts.porta), COCKPIT_MISSION: opts.missionId, COCKPIT_PROJECT: opts.projectId ?? "", COCKPIT_AGENT: spec.label })) {
+        args.push("-c", `mcp_servers.cockpit.env.${key}=${JSON.stringify(value)}`);
+      }
+    }
+    const prompt = systemPrompt(opts.agent, spec, opts.objetivo ?? "", memoriaDo(opts.projectId), opts.skills, opts.harness?.elenco);
+    if (prompt) tarefa = tarefa ? `${prompt}\n\n${tarefa}` : prompt;
+  }
+  if (maestro) {
+    const bridge = fileURLToPath(new URL("./maestro-cli.ts", import.meta.url));
+    const instructions = `Você coordena a missão com listar_especialistas, delegar, situacao, anotar, lembrar e checkpoint. Grave checkpoint após cada etapa: decisões, progresso, arquivos, tarefas delegadas, testes e próximos passos. Se MCP não estiver disponível, use o terminal: node "${bridge}" <ferramenta> '<JSON dos argumentos>'. checkpoint recebe {"texto":"resumo"}; delegar recebe {"agente":"id","tarefa":"instrução","tipo":"implementar"}; anotar recebe {"texto":"fato"}; as demais recebem {}. Não abra um segundo maestro.`;
+    tarefa = `${instructions}\n\n${tarefa ?? "Aguarde o objetivo do usuário."}`;
+  }
+
+  // A tarefa vai como argumento: o CLI já sobe com ela enviada. Digitar no PTY
+  // depois de um atraso fixo é uma corrida que se perde quando a subida demora
+  // — foi o que engoliu o primeiro briefing.
+  const porArgumento = Boolean(tarefa) && ["claude", "agy", "codex"].includes(spec.cli);
+  if (porArgumento) {
+    if (spec.cli === "agy") args.push("--prompt-interactive", tarefa!);
+    else args.push(tarefa!);
+  }
+
   const { file, args: argv } = resolveCli(spec.cli, args);
-  const paneId = `p${++counter}`;
+  const paneId = `p${++counter}-${randomUUID().slice(0, 8)}`;
 
   const pty = spawn(file, argv, {
     name: "xterm-256color",
     cols: 80,
     rows: 24,
-    cwd: cwd || ROOT,
-    env: { ...process.env, TERM: "xterm-256color" },
+    cwd: opts.cwd,
+    env: { ...ambienteLimpo(), COCKPIT_PORT: String(opts.porta), COCKPIT_MISSION: opts.missionId ?? "", COCKPIT_PROJECT: opts.projectId ?? "", COCKPIT_AGENT: spec.label },
   });
 
   const state: PaneState = {
     paneId,
-    agent,
+    agent: opts.agent,
     label: spec.label,
     cor: spec.cor,
     cli: spec.cli,
-    cwd: cwd || ROOT,
-    missionId,
+    model: bundle.model ?? null,
+    effort: bundle.effort ?? null,
+    tipo: opts.harness?.tipo ?? null,
+    cwd: opts.cwd,
+    projectId: opts.projectId,
+    missionId: opts.missionId,
     sessionId,
+    maestro,
     status: "run",
     bytesIn: 0,
     bytesOut: 0,
@@ -114,26 +326,38 @@ export function spawnPane(
   });
 
   ptys.set(paneId, entry);
+  // Quem não aceita prompt por argumento ainda precisa recebê-lo digitado.
+  if (opts.tarefa && !porArgumento) {
+    setTimeout(() => entry.pty.write(opts.tarefa! + "\r"), 4000);
+  }
   return state;
 }
 
-/** Digita o papel do agente e o briefing da missão dentro do PTY. */
-export function primePane(paneId: string, texto: string): void {
-  const entry = ptys.get(paneId);
-  if (!entry) return;
-  // O CLI precisa terminar de subir antes de receber o prompt.
-  setTimeout(() => entry.pty.write(texto + "\r"), 2500);
-}
-
+/**
+ * O onExit do node-pty é assíncrono: existe uma janela em que o processo já
+ * morreu mas o painel ainda está no mapa. Escrever ou redimensionar aí dentro
+ * lança — e um throw aqui derrubava o servidor com todos os outros agentes
+ * junto. O ResizeObserver do navegador acerta essa janela com facilidade.
+ */
 export function writePty(paneId: string, data: string): void {
   const entry = ptys.get(paneId);
-  if (!entry) return;
-  entry.state.bytesIn += data.length;
-  entry.pty.write(data);
+  if (!entry || entry.state.status === "dead") return;
+  try {
+    entry.pty.write(data);
+    entry.state.bytesIn += data.length;
+  } catch {
+    entry.state.status = "dead";
+  }
 }
 
 export function resizePty(paneId: string, cols: number, rows: number): void {
-  ptys.get(paneId)?.pty.resize(cols, rows);
+  const entry = ptys.get(paneId);
+  if (!entry || entry.state.status === "dead") return;
+  try {
+    entry.pty.resize(cols, rows);
+  } catch {
+    entry.state.status = "dead";
+  }
 }
 
 export function listPanes(): PaneState[] {
@@ -158,6 +382,22 @@ export function killPty(paneId: string): void {
   } else {
     entry.pty.kill();
   }
+}
+
+/** Wait for the previous process tree to stop before handing over its files. */
+export async function stopPane(paneId: string): Promise<void> {
+  const entry = ptys.get(paneId);
+  if (!entry) return;
+  if (process.platform === "win32") {
+    await new Promise<void>((resolve, reject) => execFile("taskkill", ["/pid", String(entry.pty.pid), "/T", "/F"], (err) => {
+      if (err && ptys.has(paneId)) reject(err); else resolve();
+    }));
+  } else {
+    entry.pty.kill();
+    for (let i = 0; i < 50 && ptys.has(paneId); i++) await new Promise(resolve => setTimeout(resolve, 100));
+    if (ptys.has(paneId)) throw Error("O painel anterior não encerrou; troca cancelada.");
+  }
+  ptys.delete(paneId);
 }
 
 /**

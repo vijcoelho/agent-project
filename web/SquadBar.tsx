@@ -1,16 +1,24 @@
 import { useState } from "react";
+import { Microfone } from "./Microfone.tsx";
+import type { EstadoVoz } from "./voz.ts";
 import type { Mission, SquadSpec } from "./api.ts";
 
 export function SquadBar({
   mission,
   squads,
   busy,
+  voz,
+  vozAqui,
+  onDitar,
   onRun,
   onAvancar,
 }: {
   mission: Mission;
   squads: Record<string, SquadSpec>;
   busy: boolean;
+  voz: EstadoVoz;
+  vozAqui: boolean;
+  onDitar: (aplicar: (texto: string) => void) => void;
   onRun: (squad: string, brief: string) => void;
   onAvancar: () => void;
 }) {
@@ -65,6 +73,14 @@ export function SquadBar({
         onKeyDown={(e) => {
           if (e.key === "Enter" && brief.trim()) onRun(squad, brief.trim());
         }}
+      />
+      <Microfone
+        estado={voz}
+        ativo={vozAqui}
+        compacto
+        onClick={() =>
+          onDitar((texto) => setBrief((antes) => (antes ? `${antes} ${texto}` : texto)))
+        }
       />
       <button
         className="btn"

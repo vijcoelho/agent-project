@@ -61,10 +61,10 @@ export function Pane({
       scrollback: 5000,
       allowProposedApi: true,
       theme: {
-        background: "#171e26",
-        foreground: "#c8d2dd",
+        background: "#060708",
+        foreground: "#c9d3de",
         cursor: pane.cor,
-        selectionBackground: "#31404f",
+        selectionBackground: "#00b4ff33",
       },
     });
     const fit = new FitAddon();
@@ -94,22 +94,35 @@ export function Pane({
 
   return (
     <section className="pane" style={{ ["--pane" as string]: pane.cor }}>
+      {/* Uma linha só. O que é detalhe vive no title; o cabeçalho carrega o
+          que se lê de relance com doze painéis abertos: quem, com quê,
+          fazendo algo ou não, e quanto custou. */}
       <header className="pane-head">
-        <span className="who">{spec?.label ?? pane.label}</span>
-        {spec?.model && <span className="model">{spec.model}</span>}
-        <Spark atividade={pane.atividade} />
-        {parado && <span className="parado">à sua espera</span>}
-        {usage && usage.turnos > 0 && (
-          <span className="meter" title={`${usage.turnos} turnos em ${usage.model ?? "—"}`}>
-            <span>{compacto(usage.in + usage.cacheWrite + usage.cacheRead)}↓</span>
-            <span>{compacto(usage.out)}↑</span>
-            <span className="custo">${usage.custo.toFixed(2)}</span>
+        <span
+          className={`luz${parado ? " parada" : ""}`}
+          title={parado ? "à sua espera" : "trabalhando"}
+        />
+        <span className="who" title={`${spec?.label ?? pane.label} · ${pane.cli}`}>
+          {spec?.label ?? pane.label}
+        </span>
+        {(pane.model ?? spec?.model) && (
+          <span className="model" title={pane.tipo ? `tarefa: ${pane.tipo}` : "modelo do catálogo"}>
+            {pane.model ?? spec?.model}
+            {pane.effort ? `·${pane.effort}` : ""}
           </span>
         )}
-        {!usage?.turnos && (
-          <span className="meter">{desdeQuando(Date.now() - pane.iniciadoEm)}</span>
+        <Spark atividade={pane.atividade} />
+        <span className="spacer" />
+        {usage && usage.turnos > 0 ? (
+          <span className="meter" title={`${compacto(usage.in + usage.cacheWrite + usage.cacheRead)} entrada · ${compacto(usage.out)} saída · ${usage.turnos} turnos em ${usage.model ?? "—"}`}>
+            ${usage.custo.toFixed(2)}
+          </span>
+        ) : (
+          <span className="meter" title="tempo desde que o painel abriu">
+            {desdeQuando(Date.now() - pane.iniciadoEm)}
+          </span>
         )}
-        <button className="btn quiet" onClick={onClose} title="fechar painel">
+        <button className="icon-btn fechar" onClick={onClose} title="fechar painel">
           ✕
         </button>
       </header>

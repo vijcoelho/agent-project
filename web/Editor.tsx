@@ -64,16 +64,16 @@ export function Editor({
         ]),
         oneDark,
         EditorView.theme({
-          "&": { height: "100%", fontSize: "12px", background: "#171e26" },
+          "&": { height: "100%", fontSize: "12px", background: "#060708" },
           ".cm-content": { fontFamily: '"Cascadia Mono", Consolas, monospace' },
           ".cm-gutters": {
-            background: "#171e26",
-            color: "#4a5561",
+            background: "#060708",
+            color: "#3a424c",
             border: "none",
-            borderRight: "1px solid #1e262f",
+            borderRight: "1px solid #16181c",
           },
-          ".cm-activeLine": { background: "#ffffff08" },
-          ".cm-activeLineGutter": { background: "#ffffff08", color: "#9aa7b5" },
+          ".cm-activeLine": { background: "#00b4ff0d" },
+          ".cm-activeLineGutter": { background: "#00b4ff0d", color: "#8b95a1" },
         }),
         ...linguagem(caminho),
         EditorView.updateListener.of((u) => {

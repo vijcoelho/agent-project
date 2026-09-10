@@ -1,8 +1,9 @@
 import { config } from "./config.ts";
-import type { Mission } from "./missions.ts";
-import { primePane, type PaneState } from "./pty.ts";
+import type { Mission } from "./state.ts";
+import type { PaneState } from "./pty.ts";
+import type { Roster } from "./config.ts";
 
-export type Fase = { nome: string; agentes: string[] };
+export type Fase = { nome: string; agentes: string[]; tipo?: string; roster?: Roster };
 
 export type SquadRun = {
   missionId: string;
@@ -15,51 +16,65 @@ export type SquadRun = {
 
 const runs = new Map<string, SquadRun>();
 
-export function getRun(missionId: string): SquadRun | undefined {
-  return runs.get(missionId);
+export const getRun = (missionId: string): SquadRun | undefined => runs.get(missionId);
+export const encerrarRun = (missionId: string): void => void runs.delete(missionId);
+
+/**
+ * O tipo da tarefa vem da fase, e o roster pode trocá-lo por agente: na fase
+ * de construção o builder implementa, mas o artista faz trabalho visual.
+ */
+function harnessDe(fase: Fase, agent: string): { tipo?: string; roster?: Roster[string] } {
+  const roster = fase.roster?.[agent];
+  return { tipo: roster?.tipo ?? fase.tipo, roster };
 }
 
-export function encerrarRun(missionId: string): void {
-  runs.delete(missionId);
+/** O papel e o objetivo já viajam no system prompt; aqui vai só a tarefa. */
+function tarefaPara(agent: string, brief: string, fase: string): string {
+  return config.agents[agent]?.maestro && config.politicaIA?.modo !== "unica"
+    ? `${brief}\n\nVocê é o maestro desta missão: divida isto entre os especialistas com as ferramentas do cockpit e acompanhe cada um.`
+    : `[fase: ${fase}] ${brief}`;
 }
 
-function briefingPara(agent: string, brief: string, fase: string): string {
-  const spec = config.agents[agent];
-  const papel = spec?.papel ?? "";
-  return [
-    papel,
-    `Fase da missão: ${fase}.`,
-    `Briefing: ${brief}`,
-    "Trabalhe só no worktree atual. Quando terminar sua parte, resuma o que fez em até 5 linhas.",
-  ]
-    .filter(Boolean)
-    .join(" ");
-}
-
-/** Sobe os painéis de uma fase e injeta papel + briefing em cada um. */
+/**
+ * Sobe o primeiro agente na hora e escalona os demais. O espaçamento existe
+ * por dois motivos: a Antigravity guarda o modelo escolhido num arquivo só, e
+ * quatro CLIs subindo no mesmo instante brigam por CPU. Os painéis atrasados
+ * chegam ao navegador pelo evento "spawned", como qualquer outro.
+ */
 function dispararFase(
   run: SquadRun,
-  mission: Mission,
-  spawn: (agent: string) => PaneState,
+  spawn: (agent: string, tarefa: string, harness?: { tipo?: string; roster?: Roster[string] }) => PaneState,
 ): PaneState[] {
   const fase = run.fases[run.faseAtual];
   if (!fase) return [];
-  return fase.agentes.map((agent) => {
-    const state = spawn(agent);
-    primePane(state.paneId, briefingPara(agent, run.brief, fase.nome));
-    return state;
+  const [primeiro, ...resto] = fase.agentes;
+  if (!primeiro) return [];
+
+  resto.forEach((agent, i) => {
+    setTimeout(
+      () => {
+        try {
+          spawn(agent, tarefaPara(agent, run.brief, fase.nome), harnessDe(fase, agent));
+        } catch (err) {
+          console.error("[cockpit] falhou ao subir", agent, err);
+        }
+      },
+      (i + 1) * 2000,
+    );
   });
+
+  return [spawn(primeiro, tarefaPara(primeiro, run.brief, fase.nome), harnessDe(fase, primeiro))];
 }
 
 export function iniciarSquad(
   mission: Mission,
   squadNome: string,
   brief: string,
-  spawn: (agent: string) => PaneState,
+  spawn: (agent: string, tarefa: string, harness?: { tipo?: string; roster?: Roster[string] }) => PaneState,
 ): { run: SquadRun; panes: PaneState[] } {
   const spec = config.squads[squadNome];
-  if (!spec) throw new Error(`squad "${squadNome}" não existe`);
-  if (!brief.trim()) throw new Error("briefing vazio");
+  if (!spec) throw new Error(`o time "${squadNome}" não existe`);
+  if (!brief.trim()) throw new Error("escreva o que o time precisa fazer");
 
   const run: SquadRun = {
     missionId: mission.id,
@@ -70,17 +85,17 @@ export function iniciarSquad(
     iniciadaEm: Date.now(),
   };
   runs.set(mission.id, run);
-  return { run, panes: dispararFase(run, mission, spawn) };
+  return { run, panes: dispararFase(run, spawn) };
 }
 
-/** O gate: você decide quando a próxima fase entra. */
+/** O portão: você decide quando a próxima fase entra. */
 export function avancarFase(
   mission: Mission,
-  spawn: (agent: string) => PaneState,
+  spawn: (agent: string, tarefa: string, harness?: { tipo?: string; roster?: Roster[string] }) => PaneState,
 ): { run: SquadRun; panes: PaneState[] } {
   const run = runs.get(mission.id);
-  if (!run) throw new Error("nenhum squad em andamento nessa missão");
-  if (run.faseAtual >= run.fases.length - 1) throw new Error("squad já está na última fase");
+  if (!run) throw new Error("nenhum time em andamento nessa missão");
+  if (run.faseAtual >= run.fases.length - 1) throw new Error("o time já está na última fase");
   run.faseAtual += 1;
-  return { run, panes: dispararFase(run, mission, spawn) };
+  return { run, panes: dispararFase(run, spawn) };
 }

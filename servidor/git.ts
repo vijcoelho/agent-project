@@ -1,45 +1,69 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { resolve, join } from "node:path";
-import { ROOT } from "./config.ts";
 
 const run = promisify(execFile);
 
-export const WORKTREES_DIR = resolve(ROOT, "..", ".cockpit-worktrees");
-
-async function git(args: string[], cwd = ROOT): Promise<string> {
+async function git(args: string[], cwd: string): Promise<string> {
   const { stdout } = await run("git", args, { cwd });
   return stdout.trim();
 }
 
-/** git worktree add needs a real HEAD; a repo with no commits cannot branch. */
-export async function assertCommittable(): Promise<void> {
-  try {
-    await git(["rev-parse", "HEAD"]);
-  } catch {
-    throw new Error(
-      "o repositório ainda não tem nenhum commit — rode `git add -A && git commit -m init` na raiz antes de criar missões",
-    );
-  }
+export function pastaWorktrees(root: string): string {
+  return resolve(root, "..", ".cockpit-worktrees");
 }
 
-export async function addWorktree(nome: string): Promise<{ worktree: string; branch: string }> {
-  const worktree = join(WORKTREES_DIR, nome);
-  const branch = `cockpit/${nome}`;
-  await git(["worktree", "add", worktree, "-b", branch]);
+/** Um worktree só nasce de um HEAD real: repo sem commit não gera branch. */
+export async function temCommit(root: string): Promise<boolean> {
+  return git(["rev-parse", "HEAD"], root).then(
+    () => true,
+    () => false,
+  );
+}
+
+/**
+ * Prepara a pasta para isolamento por missão: inicia o git e faz o primeiro
+ * commit. Só roda quando você pede — nunca por conta própria.
+ */
+export async function prepararGit(root: string): Promise<void> {
+  await git(["init"], root).catch(() => {});
+  if (await temCommit(root)) return;
+  await git(["add", "-A"], root);
+  await git(
+    ["-c", "user.email=cockpit@local", "-c", "user.name=cockpit", "commit", "-m", "início"],
+    root,
+  ).catch(() => {
+    throw new Error("não consegui fazer o primeiro commit — a pasta está vazia?");
+  });
+}
+
+export async function addWorktree(
+  root: string,
+  projetoSlug: string,
+  missaoSlug: string,
+): Promise<{ worktree: string; branch: string }> {
+  const worktree = join(pastaWorktrees(root), projetoSlug, missaoSlug);
+  const branch = `cockpit/${missaoSlug}`;
+  await git(["worktree", "add", worktree, "-b", branch], root);
   return { worktree, branch };
 }
 
-export async function removeWorktree(worktree: string, branch: string): Promise<void> {
-  await git(["worktree", "remove", "--force", worktree]).catch(() => {});
-  await git(["worktree", "prune"]).catch(() => {});
-  await git(["branch", "-D", branch]).catch(() => {});
+export async function removeWorktree(
+  root: string,
+  worktree: string,
+  branch: string,
+): Promise<void> {
+  await git(["worktree", "remove", "--force", worktree], root).catch(() => {});
+  await git(["worktree", "prune"], root).catch(() => {});
+  await git(["branch", "-D", branch], root).catch(() => {});
 }
 
-export async function branchStatus(worktree: string): Promise<{ dirty: number; head: string }> {
+export async function branchStatus(
+  pasta: string,
+): Promise<{ dirty: number; head: string | null }> {
   const [status, head] = await Promise.all([
-    git(["status", "--porcelain"], worktree).catch(() => ""),
-    git(["rev-parse", "--short", "HEAD"], worktree).catch(() => "—"),
+    git(["status", "--porcelain"], pasta).catch(() => ""),
+    git(["rev-parse", "--short", "HEAD"], pasta).catch(() => null),
   ]);
   return { dirty: status ? status.split("\n").length : 0, head };
 }

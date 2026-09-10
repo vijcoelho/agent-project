@@ -1,7 +1,27 @@
 {
-  "root": ".",
+  "_leia": [
+    "Painel de controle do cockpit. Mexa a vontade e reinicie o servidor.",
+    "clis             = os programas que o cockpit sabe lancar.",
+    "instrucoesGerais = vai no prompt de TODO agente. Bom para fatos da maquina.",
+    "harness.tipos    = o TIPO da tarefa decide modelo e esforco, nao o agente.",
+    "                   porCli escolhe o modelo equivalente em cada provedor:",
+    "                   arquitetura -> opus no claude, gpt-6-astra no codex.",
+    "                   E aqui que se controla gasto.",
+    "agents           = os perfis. cli + model + effort + papel + cor.",
+    "squads           = times. A fase tem tipo; o roster troca por agente.",
+    "modelos/efforts  = o que cada CLI aceita. O harness confere antes de usar."
+  ],
   "port": 3000,
+  "maestroAutoSwitch": true,
+  "confiarNasPastasQueEuAbrir": true,
+  "vozIdioma": "portuguese",
   "clis": {
+    "claude": {
+      "command": "claude"
+    },
+    "agy": {
+      "command": "agy"
+    },
     "bash": {
       "command": "C:/Program Files/Git/bin/bash.exe",
       "args": [
@@ -9,32 +29,61 @@
         "-l"
       ]
     },
-    "claude": {
-      "command": "claude"
-    },
-    "gemini": {
-      "command": "gemini"
-    },
     "codex": {
       "command": "codex"
     }
   },
+  "modelos": {
+    "claude": [
+      "opus",
+      "sonnet",
+      "haiku"
+    ],
+    "agy": [
+      "gemini-3.8-flash-high",
+      "gemini-3.8-flash-medium",
+      "gemini-3.1-pro-high",
+      "claude-opus-4-6-thinking",
+      "claude-sonnet-4-6",
+      "gpt-oss-120b-medium"
+    ],
+    "codex": [
+      "gpt-6-astra",
+      "gpt-5.6-sol",
+      "gpt-5.6-terra",
+      "gpt-5.6-luna",
+      "gpt-reserve",
+      "gpt-5.5"
+    ]
+  },
   "agents": {
+    "maestro": {
+      "label": "MAESTRO",
+      "cor": "#00b4ff",
+      "cli": "claude",
+      "model": "opus",
+      "effort": "high",
+      "maestro": true,
+      "papel": "Você é o MAESTRO desta missão. Você não implementa: você divide o trabalho, delega a especialistas e cobra o resultado.\n\nComo trabalhar:\n- listar_especialistas mostra quem existe, com modelo e papel.\n- tipos_de_tarefa mostra os tipos. SEMPRE informe o tipo ao delegar: é ele que decide modelo e esforço, e é assim que se economiza token. Trabalho mecânico não vai em modelo caro.\n- listar_especialistas já vem filtrado pelo ELENCO desta missão: cada especialista aparece com o provedor em que vai realmente rodar, e quem tem escopo declarado só aceita aquele tipo de trabalho. Não insista em provedor barrado — o cockpit troca sozinho.\n- delegar aceita `provedor`: use para alternar Claude e GPT de propósito. O padrão bom é Claude construindo e GPT (ASTRA) revisando a decisão em seguida, ou os dois atacando o mesmo ponto quando o caminho não estiver claro.\n- Site, página, layout e aparência da interface são trabalho do Claude e do GPT, no tipo `site`. A tela nasce em código, não em desenho: não peça a ninguém um mockup de tela para depois mandar copiar.\n- O ARTISTA e o PINTOR (tipo `visual`) só fornecem ARQUIVOS DE IMAGEM que vão dentro da página: foto, ilustração, ícone, textura, render de objeto. Peça o arquivo com o uso e o tamanho, e mande o construtor referenciá-lo. Nunca delegue a eles decisão de layout, tipografia ou hierarquia.\n- delegar abre um painel com uma tarefa autossuficiente — o especialista NÃO vê esta conversa. Diga exatamente quais arquivos são dele: todos dividem o mesmo worktree.\n- situacao acompanha quem está trabalhando.\n- checkpoint salva o estado da missão a cada etapa concluída.\n\nSkills são instrução instalável. listar_skills mostra o acervo; ler_skill abre uma. Ao delegar, passe em `skills` os nomes que aquele especialista precisa — ele recebe o índice e lê o arquivo quando for do assunto. Se faltar uma skill para o trabalho, procurar_no_marketplace e instalar_skill resolvem sem sair daqui.\n\nReceitas são formações já provadas: listar_receitas antes de montar um time do zero. Quando uma missão der certo, salvar_receita guarda a combinação.\n\nPara imagem, vídeo ou áudio, delegue ao PINTOR ou ao CINEASTA — eles têm as ferramentas e as skills de media. Se precisar você mesmo, chame provedores_de_media ANTES de gerar_imagem/gerar_video/gerar_audio: sem provedor pronto, diga o que falta em vez de tentar.\n\nRegistre decisões duráveis com anotar: todo agente novo do projeto começa sabendo o que ficou anotado.",
+      "papel_id": "orquestrar"
+    },
     "piloto": {
       "label": "PILOTO",
       "cor": "#e2703a",
       "cli": "claude",
       "model": "opus",
       "effort": "high",
-      "papel": "Você é o PILOTO. Conduz a missão de ponta a ponta: decide a ordem, implementa e integra o trabalho dos outros painéis."
+      "papel": "Você é o PILOTO. Conduz a missão de ponta a ponta: decide a ordem, implementa e integra o trabalho dos outros painéis. Site, app, layout e código são seus — a tela é desenhada em código, por você, não delegada ao Gemini. O Gemini entra só para produzir os arquivos de imagem que vão dentro dela.",
+      "papel_id": "executar"
     },
     "builder": {
       "label": "BUILDER",
       "cor": "#4fb286",
       "cli": "claude",
       "model": "sonnet",
-      "effort": "medium",
-      "papel": "Você é o BUILDER. Implementa exatamente o que foi pedido, sem alargar escopo. Código enxuto, no padrão do que já existe."
+      "effort": "high",
+      "papel": "Você é o BUILDER. Constrói site, front-end e código de aplicação. Implementa exatamente o que foi pedido, sem alargar escopo, no padrão do que já existe. O layout e a aparência da tela você decide e escreve em código — não peça desenho de tela a ninguém. Quando faltar um arquivo de imagem (foto, ilustração, ícone), peça ao ARTISTA só esse arquivo e siga com o código.",
+      "papel_id": "executar"
     },
     "reviewer": {
       "label": "REVIEWER",
@@ -42,7 +91,8 @@
       "cli": "claude",
       "model": "opus",
       "effort": "high",
-      "papel": "Você é o REVIEWER. Não escreve código de produção: lê o diff, procura bug de verdade e reporta com arquivo:linha."
+      "papel": "Você é o REVIEWER. Não escreve código de produção: lê o diff, procura bug de verdade e reporta com arquivo:linha.",
+      "papel_id": "revisar"
     },
     "scout": {
       "label": "SCOUT",
@@ -50,21 +100,101 @@
       "cli": "claude",
       "model": "haiku",
       "effort": "low",
-      "papel": "Você é o SCOUT. Explora o repositório e responde onde as coisas estão. Não edita arquivo nenhum."
+      "papel": "Você é o SCOUT. Explora o repositório e responde onde as coisas estão. Não edita arquivo nenhum.",
+      "papel_id": "pesquisar"
     },
-    "torre": {
-      "label": "TORRE",
+    "artista": {
+      "label": "ARTISTA",
+      "cor": "#d9a441",
+      "cli": "agy",
+      "model": "gemini-3.1-pro-high",
+      "effort": "high",
+      "papel": "Você é o ARTISTA, rodando Gemini Pro pela Antigravity. Você é o fornecedor de ARQUIVOS DE IMAGEM do projeto: foto, ilustração, ícone, textura, logo, render de um objeto — as imagens que ficam DENTRO do site pronto. Também descreve o conteúdo de uma imagem que te derem.\n\nO que não é seu, mesmo se pedirem: desenhar telas, propor layout, wireframe, mockup de interface, escolher tipografia, paleta ou hierarquia da página, e escrever HTML, CSS, JS ou texto de produto. A aparência da interface é decidida por quem constrói, em código. Se a tarefa for essa, devolva dizendo que é trabalho do time do Claude e entregue só os arquivos de imagem que couberem no pedido.\n\nSalve o que produzir numa pasta do projeto e responda com o caminho de cada arquivo, com as dimensões e para que serve.",
+      "papel_id": "media"
+    },
+    "flash": {
+      "label": "FLASH",
+      "cor": "#5bb8a8",
+      "cli": "agy",
+      "model": "gemini-3.8-flash-high",
+      "effort": "high",
+      "papel": "Você é o FLASH, rodando Gemini 3.8 Flash. Trabalho volumoso e mecânico, e reserva quando o limite do Claude estoura.",
+      "papel_id": "executar"
+    },
+    "opus46": {
+      "label": "OPUS 4.6",
       "cor": "#c9628f",
-      "cli": "codex",
-      "papel": "Você é a TORRE. Segunda opinião de outro provedor sobre a mesma tarefa."
+      "cli": "agy",
+      "model": "claude-opus-4-6-thinking",
+      "effort": "high",
+      "papel": "Você é o OPUS 4.6, rodando pela Antigravity. Segunda opinião sobre a mesma tarefa, por outro caminho de cobrança.",
+      "papel_id": "revisar"
     },
     "shell": {
       "label": "SHELL",
       "cor": "#7d8894",
       "cli": "bash"
+    },
+    "astra": {
+      "label": "ASTRA",
+      "cor": "#74a8f5",
+      "cli": "codex",
+      "model": "gpt-6-astra",
+      "effort": "xhigh",
+      "papel": "Você é o ASTRA, rodando GPT-6 Astra pelo Codex — o modelo mais capaz que esta máquina tem, e o mais caro. Trabalho de arquitetura, ambiguidade e bug difícil. Não aceite tarefa mecânica: devolva dizendo que é trabalho de modelo barato.",
+      "papel_id": "orquestrar"
+    },
+    "terra": {
+      "label": "TERRA",
+      "cor": "#6fc3a0",
+      "cli": "codex",
+      "model": "gpt-5.6-terra",
+      "effort": "medium",
+      "papel": "Você é o TERRA, rodando GPT-5.6 Terra pelo Codex. Implementação do dia a dia, equilibrando velocidade e cuidado.",
+      "papel_id": "executar"
+    },
+    "luna": {
+      "label": "LUNA",
+      "cor": "#b9a2e0",
+      "cli": "codex",
+      "model": "gpt-5.6-luna",
+      "effort": "low",
+      "papel": "Você é o LUNA, rodando GPT-5.6 Luna pelo Codex. Volume e trabalho mecânico: renomear, mover, formatar, aplicar padrão já decidido.",
+      "papel_id": "executar"
+    },
+    "pintor": {
+      "label": "PINTOR",
+      "cor": "#c9628f",
+      "cli": "claude",
+      "model": "sonnet",
+      "effort": "medium",
+      "papel_id": "media",
+      "papel": "Você é o PINTOR. Você produz os arquivos de imagem, vídeo e áudio que vão dentro do produto — não desenha telas nem decide layout de interface. Você não desenha com as mãos: você usa as ferramentas de media do cockpit — gerar_imagem, gerar_video, gerar_audio. Escreva o prompt visual você mesmo, com detalhe de enquadramento, luz e estilo, e itere: gere, olhe o caminho devolvido, ajuste o prompt. Salve tudo em media/ e sempre informe o caminho do arquivo. Antes de gerar, chame provedores_de_media. Prefira sempre o provedor de assinatura (Higgsfield) — os de chave de API cobram à parte. Se nenhum estiver pronto, diga exatamente o que falta em vez de tentar."
+    },
+    "cineasta": {
+      "label": "CINEASTA",
+      "cor": "#5bb8a8",
+      "cli": "claude",
+      "model": "opus",
+      "effort": "high",
+      "papel_id": "media",
+      "papel": "Você é o CINEASTA. Você planeja a peça inteira antes de gastar uma geração: roteiro, planos, ordem, trilha e narração. Vídeo custa caro e demora, então primeiro gere as imagens-chave com gerar_imagem, aprove-as, e só então anime com gerar_video passando a referência. A narração vem de gerar_audio. Monte a sequência num arquivo de descrição na pasta media/ e diga o que ficou pronto e o que falta. Antes de gerar, chame provedores_de_media. Prefira sempre o provedor de assinatura (Higgsfield) — os de chave de API cobram à parte. Se nenhum estiver pronto, diga exatamente o que falta em vez de tentar."
     }
   },
   "squads": {
+    "regido": {
+      "label": "REGIDO",
+      "descricao": "o maestro divide o trabalho e chama quem precisar",
+      "fases": [
+        {
+          "nome": "regência",
+          "agentes": [
+            "maestro"
+          ],
+          "tipo": "arquitetura"
+        }
+      ]
+    },
     "revisao": {
       "label": "REVISÃO",
       "descricao": "um constrói, dois auditam em paralelo",
@@ -74,29 +204,96 @@
           "agentes": [
             "piloto",
             "builder"
-          ]
+          ],
+          "tipo": "implementar",
+          "roster": {
+            "piloto": {
+              "tipo": "arquitetura"
+            }
+          }
         },
         {
           "nome": "auditoria",
           "agentes": [
             "reviewer",
             "scout"
-          ]
+          ],
+          "tipo": "auditoria",
+          "roster": {
+            "scout": {
+              "tipo": "explorar"
+            }
+          }
         }
       ]
     },
     "paralelo": {
       "label": "PARALELO",
-      "descricao": "quatro agentes atacando o mesmo brief de ângulos diferentes",
+      "descricao": "quatro atacando o mesmo brief por caminhos diferentes",
       "fases": [
         {
           "nome": "ataque",
           "agentes": [
             "piloto",
             "builder",
-            "scout",
-            "torre"
-          ]
+            "opus46",
+            "flash"
+          ],
+          "tipo": "implementar",
+          "roster": {
+            "piloto": {
+              "tipo": "arquitetura"
+            },
+            "flash": {
+              "tipo": "volume"
+            }
+          }
+        }
+      ]
+    },
+    "site": {
+      "label": "SITE",
+      "descricao": "Claude e GPT decidem e constroem a tela; Gemini só entrega os arquivos de imagem",
+      "fases": [
+        {
+          "nome": "construção",
+          "agentes": [
+            "piloto",
+            "builder",
+            "artista"
+          ],
+          "tipo": "site",
+          "roster": {
+            "artista": {
+              "tipo": "visual"
+            },
+            "builder": {
+              "tipo": "site-volume"
+            }
+          }
+        },
+        {
+          "nome": "auditoria",
+          "agentes": [
+            "reviewer",
+            "astra"
+          ],
+          "tipo": "auditoria"
+        }
+      ]
+    },
+    "provedores": {
+      "label": "TRÊS PROVEDORES",
+      "descricao": "o mesmo brief atacado por Claude, Codex e Gemini",
+      "fases": [
+        {
+          "nome": "ataque",
+          "agentes": [
+            "piloto",
+            "astra",
+            "flash"
+          ],
+          "tipo": "arquitetura"
         }
       ]
     }
@@ -132,5 +329,421 @@
       "cacheWrite": 1.25,
       "cacheRead": 0.1
     }
-  }
+  },
+  "instrucoesGerais": "Nesta máquina NÃO existe API key do Gemini nem do Google AI — não tente usar GEMINI_API_KEY, @google/generative-ai ou chamadas HTTP à API do Gemini, porque vão falhar. O Gemini está disponível apenas pelo CLI `agy` (Antigravity), já autenticado. Use pelo terminal: `agy --model <modelo> -p \"seu pedido\"` para uma resposta única. Modelos: gemini-3.1-pro-high (raciocínio longo e imagens), gemini-3.8-flash-high (rápido), claude-opus-4-6-thinking, claude-sonnet-4-6, gpt-oss-120b-medium. Para gerar ou analisar imagens, o caminho é o `agy` com um modelo Gemini. Nesta máquina, site, front-end, layout e aparência de interface são trabalho do Claude e do GPT (Codex), decididos e escritos em código. O Gemini entra apenas para produzir os ARQUIVOS DE IMAGEM que vão dentro do produto — foto, ilustração, ícone, textura, render de objeto — e para descrever imagens. Ele não desenha telas, não propõe layout e não faz mockup de interface.",
+  "harness": {
+    "tipos": {
+      "mecanico": {
+        "label": "Mecânico",
+        "descricao": "renomear, mover, formatar, aplicar um padrão já decidido",
+        "porCli": {
+          "claude": {
+            "model": "haiku",
+            "effort": "low"
+          },
+          "agy": {
+            "model": "gemini-3.8-flash-high",
+            "effort": "low"
+          },
+          "codex": {
+            "model": "gpt-5.6-luna",
+            "effort": "low"
+          }
+        }
+      },
+      "explorar": {
+        "label": "Explorar",
+        "descricao": "achar onde as coisas estão, ler e resumir o que existe",
+        "porCli": {
+          "claude": {
+            "model": "haiku",
+            "effort": "low"
+          },
+          "agy": {
+            "model": "gemini-3.8-flash-high",
+            "effort": "low"
+          },
+          "codex": {
+            "model": "gpt-5.6-luna",
+            "effort": "low"
+          }
+        }
+      },
+      "implementar": {
+        "label": "Implementar",
+        "descricao": "escrever código para algo que já está decidido",
+        "porCli": {
+          "claude": {
+            "model": "sonnet",
+            "effort": "medium"
+          },
+          "agy": {
+            "model": "gemini-3.8-flash-high",
+            "effort": "medium"
+          },
+          "codex": {
+            "model": "gpt-5.6-terra",
+            "effort": "medium"
+          }
+        }
+      },
+      "site": {
+        "label": "Site / front-end",
+        "descricao": "construir página, interface e visual do produto EM CÓDIGO",
+        "clis": [
+          "claude",
+          "codex"
+        ],
+        "porCli": {
+          "claude": {
+            "model": "opus",
+            "effort": "medium"
+          },
+          "codex": {
+            "model": "gpt-6-astra",
+            "effort": "low"
+          }
+        }
+      },
+      "site-volume": {
+        "label": "Site (volume)",
+        "descricao": "muitas telas ou componentes de um padrão já decidido",
+        "clis": [
+          "claude",
+          "codex"
+        ],
+        "porCli": {
+          "claude": {
+            "model": "sonnet",
+            "effort": "high"
+          },
+          "codex": {
+            "model": "gpt-5.6-terra",
+            "effort": "medium"
+          }
+        }
+      },
+      "arquitetura": {
+        "label": "Arquitetura",
+        "descricao": "decidir estrutura, resolver ambiguidade, projetar do zero",
+        "porCli": {
+          "claude": {
+            "model": "opus",
+            "effort": "high"
+          },
+          "agy": {
+            "model": "gemini-3.1-pro-high",
+            "effort": "high"
+          },
+          "codex": {
+            "model": "gpt-6-astra",
+            "effort": "xhigh"
+          }
+        }
+      },
+      "auditoria": {
+        "label": "Auditoria",
+        "descricao": "caçar bug de verdade, revisar diff com rigor",
+        "porCli": {
+          "claude": {
+            "model": "opus",
+            "effort": "high"
+          },
+          "agy": {
+            "model": "gemini-3.1-pro-high",
+            "effort": "high"
+          },
+          "codex": {
+            "model": "gpt-6-astra",
+            "effort": "high"
+          }
+        }
+      },
+      "visual": {
+        "label": "Imagem (arquivo)",
+        "descricao": "gerar um ARQUIVO de imagem que vai dentro do produto: foto, ilustração, ícone, textura, render de um objeto. Não é desenhar tela, layout, wireframe nem decidir aparência de interface — isso é do tipo site.",
+        "cli": "agy",
+        "model": "gemini-3.1-pro-high",
+        "effort": "high",
+        "porCli": {
+          "agy": {
+            "model": "gemini-3.1-pro-high",
+            "effort": "high"
+          }
+        },
+        "visual": true,
+        "clis": [
+          "agy"
+        ]
+      },
+      "volume": {
+        "label": "Volume",
+        "descricao": "muito texto ou muitos arquivos, sem raciocínio denso",
+        "porCli": {
+          "claude": {
+            "model": "haiku",
+            "effort": "low"
+          },
+          "agy": {
+            "model": "gemini-3.8-flash-high",
+            "effort": "medium"
+          },
+          "codex": {
+            "model": "gpt-reserve",
+            "effort": "low"
+          }
+        }
+      }
+    }
+  },
+  "efforts": {
+    "claude": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max"
+    ],
+    "agy": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "codex": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+      "ultra"
+    ]
+  },
+  "media": {
+    "higgsfield": {
+      "label": "Higgsfield",
+      "faz": [
+        "image",
+        "video",
+        "audio"
+      ],
+      "via": "cli",
+      "pagamento": "assinatura",
+      "comando": "higgsfield",
+      "modelos": [
+        "gpt_image_2",
+        "nano_banana_2",
+        "nano_banana_pro",
+        "z_image",
+        "text2image_soul_v2",
+        "soul_cinema",
+        "recraft_v4_1",
+        "flux_kontext_max",
+        "seedance_2_0",
+        "seedance_2_5",
+        "kling3_0",
+        "kling3_0_turbo",
+        "gemini_omni_flash",
+        "veo_3_1_lite",
+        "minimax_hailuo",
+        "seed_audio",
+        "sonilo_music",
+        "text2speech_v2"
+      ],
+      "modeloPorTipo": {
+        "image": "gpt_image_2",
+        "video": "seedance_2_0",
+        "audio": "seed_audio"
+      },
+      "instalar": "npm i -g @higgsfield/cli",
+      "instalarComando": [
+        "npm",
+        "i",
+        "-g",
+        "@higgsfield/cli"
+      ],
+      "nota": "cobra créditos da sua assinatura, sem chave de API. Depois de instalar, rode `higgsfield auth login` uma vez no terminal."
+    },
+    "gemini-image": {
+      "label": "Gemini (chave de API)",
+      "faz": [
+        "image"
+      ],
+      "via": "http",
+      "pagamento": "chave",
+      "chaveEnv": "GEMINI_API_KEY",
+      "modelos": [
+        "gemini-3-pro-image-preview",
+        "gemini-3.1-flash-image-preview",
+        "gemini-2.5-flash-image"
+      ],
+      "modelo": "gemini-3.1-flash-image-preview",
+      "instalar": "pegue a chave em aistudio.google.com/apikey e cole aqui",
+      "nota": "cobrança à parte, por uso. Sua assinatura Google Pro NÃO cobre isto — o agy só expõe modelos de texto."
+    },
+    "gpt-image": {
+      "label": "GPT Image (chave de API)",
+      "faz": [
+        "image"
+      ],
+      "via": "http",
+      "pagamento": "chave",
+      "chaveEnv": "OPENAI_API_KEY",
+      "modelos": [
+        "gpt-image-1"
+      ],
+      "modelo": "gpt-image-1",
+      "instalar": "pegue a chave em platform.openai.com/api-keys e cole aqui",
+      "nota": "cobrança à parte, por uso. Sua assinatura Plus NÃO cobre isto — o codex só faz código."
+    },
+    "replicate": {
+      "label": "Replicate (chave de API)",
+      "faz": [
+        "video"
+      ],
+      "via": "http",
+      "pagamento": "chave",
+      "chaveEnv": "REPLICATE_API_TOKEN",
+      "modelos": [
+        "kwaivgi/kling-v2.1",
+        "bytedance/seedance-1-pro",
+        "wan-video/wan-2.5-t2v",
+        "minimax/hailuo-02"
+      ],
+      "modelo": "bytedance/seedance-1-pro",
+      "instalar": "pegue o token em replicate.com/account/api-tokens e cole aqui",
+      "nota": "cobrança por geração. O Higgsfield já cobre estes modelos pela assinatura."
+    },
+    "elevenlabs": {
+      "label": "ElevenLabs (chave de API)",
+      "faz": [
+        "audio"
+      ],
+      "via": "http",
+      "pagamento": "chave",
+      "chaveEnv": "ELEVENLABS_API_KEY",
+      "modelos": [
+        "eleven_multilingual_v2",
+        "eleven_turbo_v2_5"
+      ],
+      "modelo": "eleven_multilingual_v2",
+      "instalar": "pegue a chave em elevenlabs.io/app/settings/api-keys e cole aqui",
+      "nota": "cobrança à parte. O Higgsfield faz voz por `text2speech_v2` pela assinatura."
+    }
+  },
+  "receitas": {
+    "landing-page": {
+      "label": "Landing page",
+      "descricao": "Uma página só, do zero: Claude e GPT decidem e escrevem a tela, Gemini entrega só as imagens.",
+      "modo": "squad",
+      "squad": "site",
+      "tipo": "site",
+      "paineis": 4,
+      "elenco": {
+        "clis": [
+          "claude",
+          "codex",
+          "agy"
+        ],
+        "soVisual": [
+          "agy"
+        ]
+      },
+      "daCasa": true
+    },
+    "corrigir-bug": {
+      "label": "Caçar um bug",
+      "descricao": "Investigar antes de mexer. Barato para procurar, forte para consertar.",
+      "modo": "livre",
+      "agent": "scout",
+      "tipo": "explorar",
+      "paineis": 2,
+      "daCasa": true
+    },
+    "refatorar": {
+      "label": "Refatorar com rede",
+      "descricao": "Alguém muda, alguém confere. Nunca sozinho.",
+      "modo": "squad",
+      "squad": "revisao",
+      "tipo": "implementar",
+      "paineis": 2,
+      "daCasa": true
+    },
+    "decidir-arquitetura": {
+      "label": "Decidir arquitetura",
+      "descricao": "Uma cabeça só, a mais forte, sem pressa.",
+      "modo": "livre",
+      "agent": "maestro",
+      "tipo": "arquitetura",
+      "paineis": 1,
+      "daCasa": true
+    },
+    "mutirao": {
+      "label": "Mutirão",
+      "descricao": "Muita tarefa repetida ao mesmo tempo, no modelo mais barato.",
+      "modo": "squad",
+      "squad": "paralelo",
+      "tipo": "volume",
+      "paineis": 8,
+      "daCasa": true
+    },
+    "peca-visual": {
+      "label": "Peça visual",
+      "descricao": "Um arquivo de imagem para o produto: gera, olha e itera até prestar.",
+      "modo": "livre",
+      "agent": "pintor",
+      "tipo": "visual",
+      "paineis": 2,
+      "daCasa": true
+    },
+    "video-curto": {
+      "label": "Vídeo curto",
+      "descricao": "Roteiro, imagens-chave, animação e narração — nessa ordem.",
+      "modo": "livre",
+      "agent": "cineasta",
+      "tipo": "arquitetura",
+      "paineis": 2,
+      "daCasa": true
+    },
+    "auditar": {
+      "label": "Auditoria",
+      "descricao": "Ler tudo e apontar o que está errado, sem escrever código.",
+      "modo": "livre",
+      "agent": "reviewer",
+      "tipo": "auditoria",
+      "paineis": 1,
+      "daCasa": true
+    },
+    "site-claude-gpt": {
+      "label": "Site com Claude + GPT",
+      "descricao": "O maestro divide sozinho, alternando Claude e GPT. Gemini entra só para gerar arquivo de imagem.",
+      "modo": "agentico",
+      "tipo": "site",
+      "paineis": 1,
+      "elenco": {
+        "clis": [
+          "claude",
+          "codex",
+          "agy"
+        ],
+        "soVisual": [
+          "agy"
+        ]
+      },
+      "daCasa": true
+    },
+    "so-claude": {
+      "label": "Só Claude",
+      "descricao": "Nenhum outro provedor entra. O tipo da tarefa continua escolhendo o modelo.",
+      "modo": "agentico",
+      "tipo": "site",
+      "paineis": 1,
+      "elenco": {
+        "clis": [
+          "claude"
+        ]
+      },
+      "daCasa": true
+    }
+  },
+  "marketplaces": []
 }

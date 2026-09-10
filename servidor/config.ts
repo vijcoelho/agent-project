@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 export type CliSpec = { command: string; args?: string[] };
 
@@ -11,28 +11,157 @@ export type AgentSpec = {
   effort?: string;
   args?: string[];
   papel?: string;
+  /** Recebe as ferramentas do cockpit para delegar aos outros. */
+  maestro?: boolean;
+  /** Skills que este agente sempre carrega. */
+  skills?: string[];
+  /**
+   * Lista fechada de skills. Ausente = sem restrição; presente = só estas,
+   * mesmo que outra se auto-instale pelo papel. Vazia = nenhuma.
+   */
+  allowedSkills?: string[];
+  /** Papel para auto-instalação de skills: builder, reviewer, scout… */
+  papel_id?: string;
+};
+
+/**
+ * Receita: uma formação de harness que já se provou certa para um tipo de
+ * objetivo — agente + skills + cli + modelo + esforço, junto. Serve para não
+ * remontar o time do zero a cada missão parecida.
+ */
+export type Receita = {
+  label: string;
+  descricao: string;
+  /** Modo da missão: livre, squad ou agentico. */
+  modo?: string;
+  squad?: string;
+  agent?: string;
+  tipo?: string;
+  cli?: string;
+  model?: string;
+  effort?: string;
+  skills?: string[];
+  /** Elenco de IAs que a receita já traz pronto. */
+  elenco?: Elenco;
+  /** Quantos painéis a missão abre. */
+  paineis?: number;
+  /** Receita da casa não some numa atualização; a sua é sua. */
+  daCasa?: boolean;
+};
+
+export type MediaProvider = {
+  label: string;
+  /** image | video | audio — o que este provedor sabe fazer. */
+  faz: string[];
+  /** Como o cockpit chama: "cli" (comando local) ou "http" (API com chave). */
+  via: "cli" | "http";
+  /** Comando a procurar no PATH, quando via=cli. */
+  comando?: string;
+  /** Variável de ambiente que carrega a chave, quando via=http. */
+  chaveEnv?: string;
+  modelos?: string[];
+  modelo?: string;
+  /** Modelo por tipo — imagem, vídeo e áudio usam IDs diferentes. */
+  modeloPorTipo?: Record<string, string>;
+  /** Como o cockpit paga: "assinatura" (login no CLI) ou "chave" (API). */
+  pagamento?: "assinatura" | "chave";
+  /** Comando de instalação que o cockpit pode rodar por você. */
+  instalarComando?: string[];
+  /** Argumentos do comando, com {prompt} {saida} {modelo}. */
+  args?: string[];
+  /** Como habilitar, quando falta algo. */
+  instalar?: string;
+  nota?: string;
+};
+
+export type Roster = Record<string, { cli?: string; model?: string; effort?: string; tipo?: string }>;
+
+/**
+ * Elenco: quais IAs entram nesta missão, e em que configuração.
+ *
+ * Sem isto quem decide o provedor é o catálogo do agente, e uma missão de site
+ * terminava com o Gemini escrevendo front-end. O elenco é a decisão do dono da
+ * missão: estes provedores, neste modelo, neste esforço — e quem só serve para
+ * imagem só entra quando a tarefa for visual.
+ */
+export type Elenco = {
+  /** Provedores liberados, na ordem de preferência. Vazio = todos. */
+  clis: string[];
+  /** Modelo e esforço fixados por provedor. Fixado ganha do tipo da tarefa. */
+  porCli?: Record<string, { model?: string; effort?: string }>;
+  /** Provedores que só entram em tarefa visual — imagem, vídeo, mockup. */
+  soVisual?: string[];
 };
 
 export type SquadSpec = {
   label: string;
   descricao: string;
-  fases: { nome: string; agentes: string[] }[];
+  fases: { nome: string; agentes: string[]; tipo?: string; roster?: Roster }[];
+};
+
+export type TipoTarefa = {
+  label: string;
+  descricao: string;
+  /** Provedor ao qual pertencem os defaults; não substitui o CLI do agente. */
+  cli?: string;
+  model?: string;
+  effort?: string;
+  /** O equivalente da tarefa em cada provedor: opus no claude, astra no codex. */
+  porCli?: Record<string, { model?: string; effort?: string }>;
+  /** Só estes provedores fazem este tipo de tarefa. Ausente = qualquer um. */
+  clis?: string[];
+  /** Tarefa de imagem/vídeo: quem é do elenco só para visual pode pegar. */
+  visual?: boolean;
 };
 
 export type Preco = { in: number; out: number; cacheWrite: number; cacheRead: number };
 
+export type ExecucaoIA = { cli: string; model: string; effort: string };
+export type PoliticaIA = { modo: "padrao" | "unica" | "dividida"; unica?: ExecucaoIA; papeis?: Record<string, ExecucaoIA> };
+
 type CockpitConfig = {
-  root: string;
+  politicaIA?: PoliticaIA;
+  maestroAutoSwitch?: boolean;
   port: number;
+  /** Marca as pastas que você abre como confiáveis para o Claude Code. */
+  confiarNasPastasQueEuAbrir?: boolean;
+  /** Idioma do ditado: portuguese, english, spanish… */
+  vozIdioma?: string;
+  /** Colado no prompt de todo agente: fatos desta máquina. */
+  instrucoesGerais?: string;
   clis: Record<string, CliSpec>;
   agents: Record<string, AgentSpec>;
   squads: Record<string, SquadSpec>;
   precos: Record<string, Preco>;
+  /** Modelos que cada CLI aceita — o harness usa para não cruzar provedores. */
+  modelos?: Record<string, string[]>;
+  /** Níveis de esforço que cada CLI aceita. */
+  efforts?: Record<string, string[]>;
+  harness?: { tipos: Record<string, TipoTarefa> };
+  receitas?: Record<string, Receita>;
+  /** Provedores de imagem, vídeo e áudio. */
+  media?: Record<string, MediaProvider>;
+  /** Repositórios git no formato de marketplace do Claude Code. */
+  marketplaces?: { id: string; url: string }[];
 };
 
-const raw = JSON.parse(
-  readFileSync(new URL("../cockpit.json", import.meta.url), "utf8"),
-) as CockpitConfig;
+const ARQUIVO = process.env.COCKPIT_CONFIG ?? fileURLToPath(new URL("../cockpit.json", import.meta.url));
 
-export const config = raw;
-export const ROOT = resolve(process.cwd(), raw.root);
+const ler = (): CockpitConfig => JSON.parse(readFileSync(ARQUIVO, "utf8")) as CockpitConfig;
+
+/**
+ * O objeto é sempre o mesmo, mutado no lugar: todos os módulos que já
+ * importaram `config` enxergam a mudança sem reiniciar o servidor.
+ */
+export const config: CockpitConfig = ler();
+
+export function salvarConfig(): void {
+  writeFileSync(ARQUIVO, JSON.stringify(config, null, 2) + "\n", "utf8");
+}
+
+export function recarregarConfig(): void {
+  const novo = ler() as unknown as Record<string, unknown>;
+  const alvo = config as unknown as Record<string, unknown>;
+  for (const k of Object.keys(alvo)) delete alvo[k];
+  Object.assign(alvo, novo);
+}
