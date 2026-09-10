@@ -6,7 +6,8 @@
     "build": "vite build",
     "start": "vite build && node servidor/index.ts",
     "server": "node servidor/index.ts",
-    "dev": "vite"
+    "dev": "vite",
+    "test": "node scripts/testar.mjs"
   },
   "dependencies": {
     "@codemirror/lang-css": "^6.3.1",

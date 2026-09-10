@@ -21,7 +21,9 @@ import { execucaoDoPapel } from "./politica-ia.ts";
  *   4. o tipo da tarefa, na versão do provedor escolhido
  *   5. o default do agente no catálogo  (mais fraco)
  *
- * O elenco também é um portão: um provedor fora dele não abre painel nenhum.
+ * O elenco é um portão: um provedor fora dele não abre painel nenhum. O
+ * `clis` de um tipo de tarefa estreita esse portão, mas não abre um sozinho:
+ * sem elenco, o provedor do agente é respeitado.
  * Se o agente escolhido pertence a um CLI barrado, ele é trocado pelo primeiro
  * provedor liberado que sirva à tarefa — o papel do agente é preservado, só a
  * execução muda. É assim que "site é com o Claude, imagem é com o Gemini"
@@ -79,11 +81,19 @@ const ehVisual = (tipo: TipoTarefa | undefined): boolean => tipo?.visual === tru
  * Quem pode receber esta tarefa: o elenco menos os que só fazem visual, ou
  * só os que fazem visual quando a tarefa é visual. Um tipo de tarefa também
  * pode fechar a porta — "site" não vai para o Gemini nem se ele estiver no
- * elenco. Sem elenco declarado, vale o que o tipo permitir.
+ * elenco. Sem elenco declarado, ninguém é trocado.
  */
 function liberados(elenco: Elenco | undefined, tipo: TipoTarefa | undefined): string[] | null {
   const doTipo = tipo?.clis?.length ? tipo.clis : null;
-  if (!elenco || elenco.clis.length === 0) return doTipo;
+
+  // Sem elenco declarado o tipo NÃO troca ninguém de provedor.
+  //
+  // O portão é do elenco: é você quem diz quais IAs entram na missão. O
+  // `clis` do tipo serve para estreitar essa lista, não para agir sozinho —
+  // porque agindo sozinho ele fazia uma tarefa "visual" delegada ao ASTRA
+  // abrir um painel de Gemini com o papel do ASTRA colado dentro. O agente
+  // dizia ser GPT, o modelo era outro, e ninguém no meio avisava.
+  if (!elenco || elenco.clis.length === 0) return null;
 
   const soVisual = new Set(elenco.soVisual ?? []);
   const base = ehVisual(tipo)

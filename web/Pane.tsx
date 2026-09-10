@@ -69,7 +69,12 @@ export function Pane({
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
-    term.open(host.current!);
+    // O elemento é guardado numa constante: durante a desmontagem o React
+    // zera a ref, e o ResizeObserver ainda podia disparar uma vez depois
+    // disso — era o "Cannot read properties of null" que aparecia ao fechar
+    // um projeto com painéis abertos.
+    const area = host.current!;
+    term.open(area);
 
     term.onData((data) => send({ type: "input", paneId: pane.paneId, data }));
     term.onResize(({ cols, rows }) =>
@@ -78,9 +83,11 @@ export function Pane({
     const offOutput = onOutput(pane.paneId, (data) => term.write(data));
 
     const observer = new ResizeObserver(() => {
-      if (host.current!.clientHeight > 0) fit.fit();
+      // Fora da árvore a altura é zero, e caber num espaço que não existe
+      // deixa o xterm com dimensões inválidas na próxima montagem.
+      if (area.clientHeight > 0) fit.fit();
     });
-    observer.observe(host.current!);
+    observer.observe(area);
     fit.fit();
 
     return () => {

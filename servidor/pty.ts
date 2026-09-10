@@ -2,13 +2,15 @@ import { spawn, type IPty } from "node-pty";
 import { execFile, execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { config, type AgentSpec, type Elenco } from "./config.ts";
 import { CASA, lerMemoria, type Nota } from "./state.ts";
 import { confiar } from "./confianca.ts";
 import { definirModelo } from "./agy.ts";
 import { resolverHarness, type Pedido } from "./harness.ts";
+import { argsDaPonte, envDaPonte, pontede } from "./ponte.ts";
 import { indiceParaPrompt, skillsDoAgente } from "./skills.ts";
 
 export type PaneStatus = "run" | "idle" | "dead";
@@ -47,6 +49,13 @@ const JANELA = 60;
 
 const MCP_SCRIPT = fileURLToPath(new URL("./mcp-maestro.ts", import.meta.url));
 
+/**
+ * De que família é este provedor. "openrouter" roda pelo binário do codex e
+ * por isso recebe os mesmos argumentos que ele — sandbox, MCP, modelo. Sem
+ * esta indireção cada ponte nova exigiria copiar o bloco inteiro do codex.
+ */
+export const familiaDo = (cli: string): string => config.clis[cli]?.familia ?? cli;
+
 function agentSpec(agent: string): AgentSpec {
   const spec = config.agents[agent];
   // Um nome inventado tem que virar erro: o maestro precisa saber que errou,
@@ -76,6 +85,21 @@ function acharExe(comando: string): string | null {
         stdio: ["ignore", "pipe", "ignore"],
       }).split(/\r?\n/);
       achado = linhas.find((l) => l.trim().toLowerCase().endsWith(".exe"))?.trim() ?? null;
+
+      // O pacote npm do Codex põe apenas um shim .cmd no PATH, mas traz o
+      // executável nativo dentro da dependência de plataforma. Usar o shim
+      // nos faria cair no limite de ~8 KB do cmd.exe e cortaria justamente o
+      // fim dos prompts longos — onde fica a tarefa depois do papel/skills.
+      if (!achado && comando.toLowerCase() === "codex") {
+        const shim = linhas.find((l) => l.trim().toLowerCase().endsWith("codex.cmd"))?.trim();
+        const plataforma = process.arch === "arm64" ? "codex-win32-arm64" : "codex-win32-x64";
+        const alvo = process.arch === "arm64" ? "aarch64-pc-windows-msvc" : "x86_64-pc-windows-msvc";
+        const nativo = shim && join(
+          dirname(shim), "node_modules", "@openai", "codex", "node_modules", "@openai",
+          plataforma, "vendor", alvo, "bin", "codex.exe",
+        );
+        if (nativo && existsSync(nativo)) achado = nativo;
+      }
     } catch {
       achado = null;
     }
@@ -107,7 +131,7 @@ const memoriaDo = (projectId: string | null): Nota[] =>
 export function notaDoElenco(elenco: Elenco | undefined): string {
   if (!elenco || elenco.clis.length === 0) return "";
   const nome = (cli: string) =>
-    ({ claude: "Claude", codex: "GPT (Codex)", agy: "Gemini (Antigravity)", bash: "terminal" })[cli] ?? cli;
+    ({ claude: "Claude", codex: "GPT (Codex)", agy: "Gemini (Antigravity)", bash: "terminal", openrouter: "OpenRouter (modelos grátis)" })[cli] ?? cli;
   const soVisual = new Set(elenco.soVisual ?? []);
   const linhas = elenco.clis.map((cli) => {
     const fixo = elenco.porCli?.[cli];
@@ -182,6 +206,20 @@ function ambienteLimpo(): NodeJS.ProcessEnv {
   return env;
 }
 
+/** MCPs pessoais não pertencem aos painéis isolados do cockpit. */
+function mcpsPessoaisDoCodex(): string[] {
+  const arquivo = join(process.env.CODEX_HOME || join(homedir(), ".codex"), "config.toml");
+  if (!existsSync(arquivo)) return [];
+  const nomes = new Set<string>();
+  for (const linha of readFileSync(arquivo, "utf8").split(/\r?\n/)) {
+    const m = linha.match(/^\s*\[mcp_servers\.(?:"((?:\\.|[^"])*)"|'([^']*)'|([A-Za-z0-9_-]+))(?:\.|\])?/);
+    if (!m) continue;
+    try { nomes.add(m[1] !== undefined ? JSON.parse(`"${m[1]}"`) : (m[2] ?? m[3])!); }
+    catch { /* seção ilegível: o Codex dará o erro normal dele */ }
+  }
+  return [...nomes];
+}
+
 export function spawnPane(
   opts: SpawnOpts,
   onOutput: (data: string) => void,
@@ -192,13 +230,24 @@ export function spawnPane(
   const bundle = resolverHarness({ agent: opts.agent, ...(opts.harness ?? {}) });
   const spec: AgentSpec = { ...perfil, cli: bundle.cli, model: bundle.model, effort: bundle.effort };
   const args: string[] = [...(spec.args ?? [])];
+  const familia = familiaDo(spec.cli);
   let sessionId: string | null = null;
   const maestro = spec.maestro === true;
 
-  // Sem isto, cada worktree novo trava o painel no diálogo de confiança do CLI.
-  if (config.confiarNasPastasQueEuAbrir !== false) confiar(spec.cli, opts.cwd);
+  // Uma ponte sem chave sobe o CLI, gasta a espera da subida e morre num erro
+  // de autenticação que não explica nada. Recusar aqui devolve a instrução.
+  const ponte = pontede(spec.cli);
+  if (ponte && !envDaPonte(spec.cli)[ponte.spec.chaveEnv]) {
+    throw new Error(
+      `${spec.cli} precisa de uma chave antes de abrir painel — ponha em Ajustes → Grátis, ou exporte ${ponte.spec.chaveEnv}`,
+    );
+  }
 
-  if (spec.cli === "claude") {
+  // Sem isto, cada worktree novo trava o painel no diálogo de confiança do CLI.
+  // A confiança é do binário que vai rodar, então segue a família.
+  if (config.confiarNasPastasQueEuAbrir !== false) confiar(familiaDo(spec.cli), opts.cwd);
+
+  if (familia === "claude") {
     sessionId = randomUUID();
     if (spec.model) args.push("--model", spec.model);
     if (spec.effort) args.push("--effort", spec.effort);
@@ -242,7 +291,7 @@ export function spawnPane(
   // A Antigravity não tem system prompt por flag, então papel, objetivo e
   // memória entram no começo da própria tarefa.
   let tarefa = opts.tarefa;
-  if (spec.cli === "agy") {
+  if (familia === "agy") {
     // A flag só vale em modo print; a sessão interativa lê as preferências.
     definirModelo(spec.model);
     if (spec.model) args.push("--model", spec.model);
@@ -251,7 +300,25 @@ export function spawnPane(
     if (prompt) tarefa = tarefa ? `${prompt}\n\n---\n\n${tarefa}` : prompt;
   }
 
-  if (spec.cli === "codex") {
+  if (familia === "codex") {
+    // Um provedor de ponte é o mesmo binário apontado para outro servidor.
+    // Os `-c` da ponte vêm antes dos demais para que qualquer ajuste dela
+    // possa ser sobreposto pelo que o painel decidir depois.
+    args.push(...argsDaPonte(spec.cli));
+
+    // Painéis do cockpit precisam trabalhar sem alguém aprovando cada comando.
+    // O sandbox continua limitado ao projeto; "never" só troca perguntas por
+    // falha imediata quando uma ação estiver fora desse limite.
+    args.push("--sandbox", "workspace-write", "--ask-for-approval", "never");
+
+    // Assim como --strict-mcp-config no Claude, não carregue os MCPs pessoais
+    // em todo especialista. Além do custo de subida, um MCP sem login deixa o
+    // Codex parado em avisos antes de começar a tarefa.
+    args.push("--disable", "plugins");
+    for (const nome of mcpsPessoaisDoCodex()) {
+      const segmento = /^[A-Za-z0-9_-]+$/.test(nome) ? nome : JSON.stringify(nome);
+      args.push("-c", `mcp_servers.${segmento}.enabled=false`);
+    }
     if (spec.model) args.push("--model", spec.model);
     if (spec.effort) args.push("-c", `model_reasoning_effort=${JSON.stringify(spec.effort)}`);
     if (maestro && opts.missionId) {
@@ -273,9 +340,9 @@ export function spawnPane(
   // A tarefa vai como argumento: o CLI já sobe com ela enviada. Digitar no PTY
   // depois de um atraso fixo é uma corrida que se perde quando a subida demora
   // — foi o que engoliu o primeiro briefing.
-  const porArgumento = Boolean(tarefa) && ["claude", "agy", "codex"].includes(spec.cli);
+  const porArgumento = Boolean(tarefa) && ["claude", "agy", "codex"].includes(familia);
   if (porArgumento) {
-    if (spec.cli === "agy") args.push("--prompt-interactive", tarefa!);
+    if (familia === "agy") args.push("--prompt-interactive", tarefa!);
     else args.push(tarefa!);
   }
 
@@ -287,7 +354,14 @@ export function spawnPane(
     cols: 80,
     rows: 24,
     cwd: opts.cwd,
-    env: { ...ambienteLimpo(), COCKPIT_PORT: String(opts.porta), COCKPIT_MISSION: opts.missionId ?? "", COCKPIT_PROJECT: opts.projectId ?? "", COCKPIT_AGENT: spec.label },
+    env: {
+      ...ambienteLimpo(),
+      ...envDaPonte(spec.cli),
+      COCKPIT_PORT: String(opts.porta),
+      COCKPIT_MISSION: opts.missionId ?? "",
+      COCKPIT_PROJECT: opts.projectId ?? "",
+      COCKPIT_AGENT: spec.label,
+    },
   });
 
   const state: PaneState = {

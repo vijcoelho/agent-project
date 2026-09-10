@@ -1,9 +1,12 @@
 import { execFileSync } from "node:child_process";
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { config, salvarConfig, type MediaProvider } from "./config.ts";
-import { CASA } from "./skills.ts";
+import { chaveDe as chaveDoCofre, guardarChave } from "./cofre.ts";
+
+/** O cofre agora é compartilhado; media.ts continua sendo a porta de entrada. */
+export { guardarChave };
 
 /**
  * Media: imagem, vídeo e áudio gerados de dentro do cockpit.
@@ -14,66 +17,8 @@ import { CASA } from "./skills.ts";
  * de como ligar — nunca some da lista, senão você não descobre que existe.
  */
 
-const COFRE = join(CASA, "chaves.json");
-const MESTRA = join(CASA, "chave-mestra");
-
-/**
- * A chave que cifra o cofre. Fica em arquivo separado no seu perfil.
- *
- * Isto protege contra leitura casual do JSON — backup, sincronização de
- * pasta, um agente varrendo o disco. NÃO protege contra quem já está logado
- * como você: esse alguém lê os dois arquivos. Para localhost é o nível certo;
- * não trate como cofre de verdade.
- */
-function chaveMestra(): Buffer {
-  mkdirSync(CASA, { recursive: true });
-  if (!existsSync(MESTRA)) writeFileSync(MESTRA, randomBytes(32), { mode: 0o600 });
-  return readFileSync(MESTRA);
-}
-
-type Cofre = Record<string, { iv: string; tag: string; dado: string }>;
-
-const lerCofre = (): Cofre =>
-  existsSync(COFRE) ? (JSON.parse(readFileSync(COFRE, "utf8")) as Cofre) : {};
-
-export function guardarChave(provedor: string, valor: string): void {
-  const cofre = lerCofre();
-  if (!valor) delete cofre[provedor];
-  else {
-    const iv = randomBytes(12);
-    const c = createCipheriv("aes-256-gcm", chaveMestra(), iv);
-    const dado = Buffer.concat([c.update(valor, "utf8"), c.final()]);
-    cofre[provedor] = {
-      iv: iv.toString("base64"),
-      tag: c.getAuthTag().toString("base64"),
-      dado: dado.toString("base64"),
-    };
-  }
-  mkdirSync(CASA, { recursive: true });
-  writeFileSync(COFRE, JSON.stringify(cofre, null, 2), { mode: 0o600 });
-}
-
-function lerChave(provedor: string): string | null {
-  const guardada = lerCofre()[provedor];
-  if (!guardada) return null;
-  try {
-    const d = createDecipheriv("aes-256-gcm", chaveMestra(), Buffer.from(guardada.iv, "base64"));
-    d.setAuthTag(Buffer.from(guardada.tag, "base64"));
-    return Buffer.concat([d.update(Buffer.from(guardada.dado, "base64")), d.final()]).toString("utf8");
-  } catch {
-    // Chave-mestra trocada ou arquivo corrompido: a chave se perdeu.
-    return null;
-  }
-}
-
-/** A chave em uso: a que você guardou aqui, ou a que já está no ambiente. */
-function chaveDe(id: string, spec: MediaProvider): { valor: string | null; onde: string } {
-  const guardada = lerChave(id);
-  if (guardada) return { valor: guardada, onde: "cofre do cockpit" };
-  const doAmbiente = spec.chaveEnv ? process.env[spec.chaveEnv] : undefined;
-  if (doAmbiente) return { valor: doAmbiente, onde: spec.chaveEnv! };
-  return { valor: null, onde: "" };
-}
+/** A chave em uso: a que você guardou no cofre, ou a que já está no ambiente. */
+const chaveDe = (id: string, spec: MediaProvider) => chaveDoCofre(id, spec.chaveEnv);
 
 const achado = new Map<string, string | null>();
 function noPath(comando: string): string | null {

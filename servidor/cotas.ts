@@ -4,6 +4,7 @@ import { createInterface } from "node:readline";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { resolveCli } from "./pty.ts";
+import { chaveDaPonte, listarPontes } from "./ponte.ts";
 
 /**
  * Redline: quanto resta de cada assinatura.
@@ -14,6 +15,8 @@ import { resolveCli } from "./pty.ts";
  *   codex  — duas janelas em porcentagem (5h e 7 dias), pela conta.
  *   claude — o que o próprio CLI guardou depois da última resposta.
  *   agy    — não publica porcentagem; publica o bloqueio e quando volta.
+ *   ponte  — o provedor da API responde crédito e limite; OpenRouter conta
+ *            requisições por dia na conta gratuita, não porcentagem de plano.
  *
  * Nada aqui adivinha. Sem dado, o estado é "desconhecido" — que é diferente
  * de "livre", e é a distinção que evita você confiar num painel errado.
@@ -371,6 +374,90 @@ function cotaAgy(): Cota | null {
 }
 
 // ---------------------------------------------------------------------------
+// pontes — o provedor da API diz quanto sobrou
+// ---------------------------------------------------------------------------
+
+type ChaveOpenRouter = {
+  data?: {
+    label?: string;
+    usage?: number;
+    limit?: number | null;
+    limit_remaining?: number | null;
+    is_free_tier?: boolean;
+    rate_limit?: { requests?: number; interval?: string };
+  };
+};
+
+/**
+ * O /key do OpenRouter fala de crédito comprado, não de plano. Numa conta
+ * gratuita não há teto em dólar — o limite é de requisições por dia, e o
+ * endpoint não devolve quantas você já fez. Então o honesto é dizer o que
+ * existe e marcar "desconhecido" em vez de inventar uma porcentagem.
+ */
+export function lerChaveOpenRouter(cli: string, bruto: unknown): Cota {
+  const d = (bruto as ChaveOpenRouter)?.data ?? {};
+  const janelas: Janela[] = [];
+  const gasto = typeof d.usage === "number" ? d.usage : null;
+  const teto = typeof d.limit === "number" ? d.limit : null;
+
+  if (teto !== null && teto > 0 && gasto !== null) {
+    janelas.push({ rotulo: "crédito", usadoPct: Math.min(100, (gasto / teto) * 100), voltaEm: null });
+  }
+
+  const partes: string[] = [];
+  if (d.is_free_tier) partes.push("conta gratuita");
+  if (d.rate_limit?.requests) {
+    partes.push(`${d.rate_limit.requests} requisições por ${d.rate_limit.interval ?? "janela"}`);
+  }
+  if (teto === null && gasto !== null) partes.push(`US$ ${gasto.toFixed(4)} gastos até agora`);
+
+  return {
+    cli,
+    estado: janelas.length > 0 ? estadoPor(janelas) : "desconhecido",
+    janelas,
+    plano: d.is_free_tier ? "gratuito" : (d.label ?? null),
+    detalhe:
+      janelas.length > 0
+        ? null
+        : partes.length > 0
+          ? `${partes.join(" · ")} — o OpenRouter não informa quantas você já usou hoje`
+          : "o OpenRouter não informou limite para esta chave",
+    fonte: "conta (API do provedor)",
+    lidoEm: Date.now(),
+  };
+}
+
+async function cotaDaPonte(id: string, url: string): Promise<Cota | null> {
+  const { valor } = chaveDaPonte(id);
+  if (!valor) return null;
+  try {
+    const res = await fetch(url, {
+      headers: { authorization: `Bearer ${valor}` },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new Error(`respondeu ${res.status}`);
+    return lerChaveOpenRouter(id, await res.json());
+  } catch (err) {
+    return {
+      cli: id,
+      estado: "desconhecido",
+      janelas: [],
+      plano: null,
+      detalhe: `não consegui consultar a conta: ${err instanceof Error ? err.message : String(err)}`,
+      fonte: "conta (API do provedor)",
+      lidoEm: Date.now(),
+    };
+  }
+}
+
+const cotasDasPontes = (): Promise<(Cota | null)[]> =>
+  Promise.all(
+    listarPontes()
+      .filter((p) => p.spec.cota)
+      .map((p) => cotaDaPonte(p.id, p.spec.cota!).catch(() => null)),
+  );
+
+// ---------------------------------------------------------------------------
 
 const VALIDADE = 60_000;
 let guardadas: { quando: number; cotas: Cota[] } | null = null;
@@ -380,14 +467,17 @@ export const esquecerCotas = (): void => {
   guardadas = null;
 };
 
-/** As três, com validade curta: consultar o Codex sobe um processo. */
+/** Todas, com validade curta: consultar o Codex sobe um processo. */
 export function lerCotas(): Promise<Cota[]> {
   if (guardadas && Date.now() - guardadas.quando < VALIDADE) return Promise.resolve(guardadas.cotas);
   if (emCurso) return emCurso;
 
   emCurso = (async () => {
-    const codex = await cotaCodex().catch(() => null);
-    const cotas = [codex, cotaClaude(), cotaAgy()].filter((c): c is Cota => c !== null);
+    const [codex, pontes] = await Promise.all([
+      cotaCodex().catch(() => null),
+      cotasDasPontes(),
+    ]);
+    const cotas = [codex, cotaClaude(), cotaAgy(), ...pontes].filter((c): c is Cota => c !== null);
     guardadas = { quando: Date.now(), cotas };
     emCurso = null;
     return cotas;

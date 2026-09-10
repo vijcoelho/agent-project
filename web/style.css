@@ -1655,3 +1655,47 @@ svg { flex-shrink: 0; vertical-align: middle; }
   font-size: var(--t-mini);
   white-space: pre-wrap;
 }
+
+/* ==========================================================================
+   Aba Grátis — o catálogo de modelos de custo zero das pontes.
+   ========================================================================== */
+
+.lista-modelos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 6px;
+}
+
+.modelo-livre {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--fio);
+  border-radius: var(--raio);
+  background: none;
+  color: var(--ink-3);
+  text-align: left;
+  cursor: pointer;
+}
+.modelo-livre:hover:not(:disabled) { border-color: var(--neon-linha); }
+.modelo-livre.on { border-color: var(--neon); background: var(--neon-fundo); }
+.modelo-livre:disabled { opacity: 0.5; cursor: default; }
+.modelo-livre b {
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--fonte-mono);
+  font-size: var(--t-mini);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.modelo-livre.on b { color: var(--neon); }
+.modelo-livre span { color: var(--ink-4); font-size: var(--t-mini); }
+
+/* O bloco da ponte empilha cartão, ações e catálogo. */
+.wizard-corpo .campo-bloco > .form-acoes { justify-content: flex-start; flex-wrap: wrap; }
+
+/* O "mostrar os sem ferramentas" é um link discreto, não uma barra. */
+.lista-modelos + .btn { align-self: flex-start; }

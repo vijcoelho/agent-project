@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { config } from "./config.ts";
+import { chaveDaPonte, pontede } from "./ponte.ts";
 
 /**
  * Quais CLIs existem de verdade nesta máquina.
@@ -20,6 +21,12 @@ export type Provider = {
   agentes: string[];
   /** Como instalar, quando não está. */
   instalar?: string;
+  /**
+   * Este provedor é uma API emprestando o binário de outro CLI. A tela usa
+   * para não oferecer "instalar" a quem não se instala, e para mandar você
+   * pôr a chave em vez de procurar um comando que nunca vai existir.
+   */
+  ponte?: { base: string; chaveEnv: string; chaveEm: string | null; gratis: boolean };
 };
 
 const COMO_INSTALAR: Record<string, string> = {
@@ -66,20 +73,41 @@ export function esquecerCache(): void {
 export function listarProviders(): Provider[] {
   return Object.entries(config.clis).map(([id, spec]) => {
     const caminho = achar(spec.command);
+    const ponte = pontede(id);
+    // Uma ponte com o binário no lugar mas sem chave não está disponível: ela
+    // abriria o painel e morreria autenticando. Disponível = dá para usar.
+    const credencial = ponte ? chaveDaPonte(id) : null;
     return {
       id,
       comando: spec.command,
-      disponivel: caminho !== null,
+      disponivel: caminho !== null && (!ponte || credencial!.valor !== null),
+      ...(ponte
+        ? {
+            ponte: {
+              base: spec.command,
+              chaveEnv: ponte.spec.chaveEnv,
+              chaveEm: credencial!.onde || null,
+              gratis: ponte.spec.soGratis === true,
+            },
+          }
+        : {}),
       caminho,
       modelos: config.modelos?.[id] ?? [],
       efforts: config.efforts?.[id] ?? [],
       agentes: Object.entries(config.agents)
         .filter(([, a]) => a.cli === id)
         .map(([chave]) => chave),
-      instalar: caminho ? undefined : COMO_INSTALAR[id],
+      instalar: caminho
+        ? ponte && credencial!.valor === null
+          ? `ponha a chave em Ajustes → Grátis (ou exporte ${ponte.spec.chaveEnv})`
+          : undefined
+        : (COMO_INSTALAR[id] ?? (ponte ? COMO_INSTALAR[spec.command] : undefined)),
     };
   });
 }
 
-export const providerDisponivel = (id: string): boolean =>
-  achar(config.clis[id]?.command ?? id) !== null;
+export function providerDisponivel(id: string): boolean {
+  if (achar(config.clis[id]?.command ?? id) === null) return false;
+  const ponte = pontede(id);
+  return !ponte || chaveDaPonte(id).valor !== null;
+}

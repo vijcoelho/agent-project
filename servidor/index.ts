@@ -47,6 +47,13 @@ import { aplicarSinal, esquecerCotas, lerCotas } from "./cotas.ts";
 import { escolherPasta } from "./pasta.ts";
 import { resolverHarness, tiposDeTarefa, type Pedido } from "./harness.ts";
 import { esquecerCache, listarProviders } from "./providers.ts";
+import {
+  guardarChaveDaPonte,
+  listarPontes,
+  sincronizarModelos,
+  statusPonte,
+  testarPonte,
+} from "./ponte.ts";
 import { conectar, criarAgente, desconectar, testar, PRESETS, type Conexao } from "./conectar.ts";
 import { acharSkill, apagarSkill, listarSkills, salvarSkill, skillsDoAgente } from "./skills.ts";
 import { aplicarReceita, apagarReceita, listarReceitas, salvarReceita } from "./receitas.ts";
@@ -58,6 +65,18 @@ type ClientMessage =
   | { type: "input"; paneId: string; data: string }
   | { type: "resize"; paneId: string; cols: number; rows: number }
   | { type: "kill"; paneId: string };
+
+/**
+ * A porta em uso nesta execução.
+ *
+ * `COCKPIT_PORTA` completa o par que já existia: `COCKPIT_CONFIG` e
+ * `COCKPIT_HOME` isolam configuração e estado, mas sem uma porta própria uma
+ * segunda instância morria em cima da primeira. O nome não é COCKPIT_PORT de
+ * propósito — essa variável já significa outra coisa dentro de um painel
+ * (a porta do cockpit que abriu o painel), e um cockpit iniciado de dentro de
+ * outro herdaria justamente a porta que não pode usar.
+ */
+const porta = Number(process.env.COCKPIT_PORTA) || config.port;
 
 const app = express();
 app.use(express.json({ limit: "8mb" }));
@@ -73,13 +92,32 @@ let codexQuota: Quota | null = null;
 let quotaError: string | null = null;
 let quotaPromise: Promise<void> | null = null;
 let lastQuotaCheck = 0;
-const maestroPresets: Record<string, { model: string; effort: string }> = {
+const maestroFixos: Record<string, { model: string; effort: string }> = {
   codex: { model: "gpt-6-astra", effort: "high" },
   claude: { model: "opus", effort: "high" },
   agy: { model: "gemini-3.1-pro-high", effort: "high" },
 };
+
+/**
+ * Quem pode reger, e em que configuração.
+ *
+ * As pontes entram calculadas: o modelo grátis de hoje não é o de amanhã, e
+ * escrever o id aqui garantiria um preset morto na primeira sincronização.
+ * Com isto, quando todas as assinaturas estouram, ainda sobra para onde ir —
+ * antes disso a missão simplesmente parava.
+ */
+function presetsDoMaestro(): Record<string, { model: string; effort: string }> {
+  const presets = { ...maestroFixos };
+  for (const { id } of listarPontes()) {
+    const model = config.modelos?.[id]?.[0];
+    const effort = config.efforts?.[id]?.includes("high") ? "high" : config.efforts?.[id]?.[0];
+    if (model && effort) presets[id] = { model, effort };
+  }
+  return presets;
+}
 function maestroStatus() {
-  return { agent: config.agents.maestro, auto: config.maestroAutoSwitch === true, limits: Object.fromEntries(limits), codexQuota, quotaError, providers: listarProviders().filter(p => p.id in maestroPresets) };
+  const presets = presetsDoMaestro();
+  return { agent: config.agents.maestro, auto: config.maestroAutoSwitch === true, limits: Object.fromEntries(limits), codexQuota, quotaError, providers: listarProviders().filter(p => p.id in presets) };
 }
 function notifyMaestro() { broadcast({ type: "maestro", ...maestroStatus() }); }
 
@@ -102,6 +140,13 @@ function refreshQuota(): Promise<void> {
   return quotaPromise;
 }
 
+/**
+ * Para onde a missão migra quando uma cota estoura. As assinaturas primeiro,
+ * porque são melhores; a ponte grátis por último, porque é o colete: pior que
+ * um modelo pago, e muito melhor que a missão parar no meio.
+ */
+const ordemDeTroca = (): string[] => ["codex", "agy", "claude", ...listarPontes().map(p => p.id)];
+
 function saveCheckpoint(missionId: string, value: unknown) {
   const text = String(value ?? "").trim();
   if (!text || text.length > 40000) throw Error("Checkpoint vazio ou muito grande.");
@@ -110,7 +155,7 @@ function saveCheckpoint(missionId: string, value: unknown) {
   continuity.checkpoint(missionId, text);
   const maestro = listPanes().find(p => p.missionId === missionId && p.maestro);
   if (maestro && config.maestroAutoSwitch && limits.has(maestro.cli) && !switching.has(missionId)) {
-    const cli = clisDaMissao(missionId, ["codex", "agy", "claude"]).find(cli => cli !== maestro.cli && !limits.has(cli) && listarProviders().some(p => p.id === cli && p.disponivel));
+    const cli = clisDaMissao(missionId, ordemDeTroca()).find(cli => cli !== maestro.cli && !limits.has(cli) && listarProviders().some(p => p.id === cli && p.disponivel));
     if (cli) {
       setTimeout(() => {
         if (getPane(maestro.paneId) && config.maestroAutoSwitch) void switchMaestro(missionId, cli).catch(err => broadcast({ type: "error", message: String(err) }));
@@ -125,7 +170,7 @@ async function switchMaestro(missionId: string, cli: string) {
   const fixo = execucaoDoPapel("maestro");
   if (fixo && fixo.cli !== cli) throw Error("Altere a distribuição de IA antes de trocar este papel de provedor.");
   if (switching.has(missionId)) throw Error("Troca de maestro já em andamento.");
-  if (!maestroPresets[cli] || !listarProviders().some(p => p.id === cli && p.disponivel)) throw Error("Provedor não disponível nesta máquina.");
+  if (!presetsDoMaestro()[cli] || !listarProviders().some(p => p.id === cli && p.disponivel)) throw Error("Provedor não disponível nesta máquina.");
   if (!fixo && !clisDaMissao(missionId, [cli]).includes(cli)) throw Error("Este provedor não está no elenco da missão.");
   const mission = getMission(missionId);
   if (!mission || !getProject(mission.projectId)) throw Error("Abra o projeto antes de continuar.");
@@ -135,7 +180,7 @@ async function switchMaestro(missionId: string, cli: string) {
     const task = continuity.handoff(missionId, mission.objetivo, listPanes().filter(p => p.missionId === missionId && !p.maestro));
     for (const pane of previous) { await stopPane(pane.paneId); detachPane(pane.paneId); broadcast({ type: "exit", paneId: pane.paneId, code: 0 }); }
     const configured = config.agents.maestro;
-    return abrirPainel("maestro", missionId, task, { invoke: { cli, ...(configured?.cli === cli ? { model: configured.model, effort: configured.effort } : maestroPresets[cli]) } });
+    return abrirPainel("maestro", missionId, task, { invoke: { cli, ...(configured?.cli === cli ? { model: configured.model, effort: configured.effort } : presetsDoMaestro()[cli]) } });
   } finally { switching.delete(missionId); }
 }
 
@@ -148,7 +193,7 @@ async function switchSpecialist(pane: PaneState, cli: string) {
   try {
     const task = `Continue somente a responsabilidade do painel ${pane.paneId} (${pane.label}). Consulte a entrada start desse painel no histórico para recuperar a tarefa original. Não assuma as tarefas dos outros agentes.\n\n${continuity.handoff(mission.id, mission.objetivo, listPanes().filter(p => p.missionId === mission.id && p.paneId !== pane.paneId))}`;
     await stopPane(pane.paneId); detachPane(pane.paneId); broadcast({ type: "exit", paneId: pane.paneId, code: 0 });
-    abrirPainel(pane.agent, mission.id, task, { invoke: { cli, ...maestroPresets[cli] } });
+    abrirPainel(pane.agent, mission.id, task, { invoke: { cli, ...presetsDoMaestro()[cli] } });
   } finally { switching.delete(pane.paneId); }
 }
 
@@ -166,7 +211,7 @@ function observeOutput(pane: PaneState, data: string) {
     broadcast({ type: "error", message: `${pane.cli}: cota próxima do limite. Salve um checkpoint e use Trocar maestro para continuar em outro provedor.` });
   }
   if (signal.state === "blocked" && config.maestroAutoSwitch && !switching.has(pane.maestro ? pane.missionId : pane.paneId)) {
-    const target = clisDaMissao(pane.missionId, ["codex", "agy", "claude"]).find(cli => cli !== pane.cli && !limits.has(cli) && listarProviders().some(p => p.id === cli && p.disponivel));
+    const target = clisDaMissao(pane.missionId, ordemDeTroca()).find(cli => cli !== pane.cli && !limits.has(cli) && listarProviders().some(p => p.id === cli && p.disponivel));
     if (target) void (pane.maestro ? switchMaestro(pane.missionId, target) : switchSpecialist(pane, target)).catch(err => broadcast({ type: "error", message: `Falha na continuidade: ${String(err)}` }));
     else broadcast({ type: "error", message: "Nenhum provedor alternativo disponível sem aviso de limite. Missão preservada; escolha um provedor após a renovação da cota." });
   }
@@ -224,7 +269,7 @@ function abrirPainel(
       objetivo: mission.objetivo,
       skills: [...(mission.skills ?? []), ...skills],
       tarefa,
-      porta: config.port,
+      porta,
     },
     (data) => {
       broadcast({ type: "output", paneId: state.paneId, data });
@@ -334,9 +379,9 @@ app.post("/api/maestro/refresh", async (_req, res) => { await refreshQuota(); re
 app.post("/api/maestro", (req, res) => {
   try {
     const cli = String(req.body.cli);
-    if (!maestroPresets[cli]) throw Error("Provedor inválido.");
-    const model = String(req.body.model ?? maestroPresets[cli].model);
-    const effort = String(req.body.effort ?? maestroPresets[cli].effort);
+    if (!presetsDoMaestro()[cli]) throw Error("Provedor inválido.");
+    const model = String(req.body.model ?? presetsDoMaestro()[cli].model);
+    const effort = String(req.body.effort ?? presetsDoMaestro()[cli].effort);
     if (!config.modelos?.[cli]?.includes(model) || !config.efforts?.[cli]?.includes(effort)) throw Error("Modelo ou esforço inválido para o provedor.");
     config.agents.maestro = { ...config.agents.maestro!, cli, model, effort, maestro: true };
     config.maestroAutoSwitch = req.body.auto === true;
@@ -622,6 +667,69 @@ app.post("/api/providers/:id/testar", (req, res) => {
     (r) => res.json(r),
     (err: Error) => fail(res, err),
   );
+});
+
+// ---------- pontes (OpenRouter e outras APIs sem CLI) ----------
+
+/** O PATH é assunto de providers.ts; a ponte só pergunta se o binário existe. */
+const temNoPath = (comando: string): boolean =>
+  listarProviders().some((p) => p.comando === comando && p.caminho !== null);
+
+app.get("/api/pontes", async (_req, res) => {
+  try {
+    res.json({ pontes: await Promise.all(listarPontes().map((p) => statusPonte(p.id, temNoPath))) });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+app.post("/api/pontes/:id/chave", (req, res) => {
+  try {
+    // A chave entra e não sai: nenhuma rota devolve o valor, só de onde veio.
+    guardarChaveDaPonte(req.params.id, String(req.body.chave ?? "").trim());
+    esquecerCache();
+    esquecerCotas();
+    res.json({ ok: true });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+/** Relê o catálogo do provedor e passa a lista viva para o cockpit.json. */
+app.post("/api/pontes/:id/modelos", async (req, res) => {
+  try {
+    const modelos = await sincronizarModelos(req.params.id);
+    res.json({ modelos, status: await statusPonte(req.params.id, temNoPath) });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+app.post("/api/pontes/:id/testar", async (req, res) => {
+  try {
+    res.json(await testarPonte(req.params.id, req.body?.modelo ? String(req.body.modelo) : undefined));
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+/** Fixa o modelo padrão da ponte: é o que o agente dela usa por omissão. */
+app.post("/api/pontes/:id/modelo", (req, res) => {
+  try {
+    const id = req.params.id;
+    const modelo = String(req.body.modelo ?? "");
+    const lista = config.modelos?.[id] ?? [];
+    if (!lista.includes(modelo)) throw Error(`"${modelo}" não está no catálogo de ${id}.`);
+    config.modelos![id] = [modelo, ...lista.filter((m) => m !== modelo)];
+    for (const agente of Object.values(config.agents)) {
+      if (agente.cli === id) agente.model = modelo;
+    }
+    salvarConfig();
+    notifyMaestro();
+    res.json({ ok: true });
+  } catch (err) {
+    fail(res, err);
+  }
 });
 
 // ---------- consumo ----------
@@ -955,18 +1063,18 @@ for (const mission of listMissions()) {
 // porta continuaria gravando estado vazio por cima do estado real.
 process.on("uncaughtException", (err: NodeJS.ErrnoException) => {
   if (err.code === "EADDRINUSE" || err.syscall === "listen") {
-    console.error(`[cockpit] a porta ${config.port} já está em uso — saindo`);
+    console.error(`[cockpit] a porta ${porta} já está em uso — saindo`);
     process.exit(1);
   }
   console.error("[cockpit] exceção ignorada:", err);
 });
 
 server.on("error", (err: NodeJS.ErrnoException) => {
-  console.error(`[cockpit] não consegui abrir a porta ${config.port}: ${err.message}`);
+  console.error(`[cockpit] não consegui abrir a porta ${porta}: ${err.message}`);
   process.exit(1);
 });
 
-server.listen(config.port, () => {
-  console.log(`cockpit → http://localhost:${config.port}`);
+server.listen(porta, () => {
+  console.log(`cockpit → http://localhost:${porta}`);
   console.log(`${listProjects().length} projeto(s) aberto(s)`);
 });

@@ -105,6 +105,8 @@ export type Provider = {
   efforts?: string[];
   agentes: string[];
   instalar?: string;
+  /** Presente quando o provedor é uma API rodando pelo binário de outro CLI. */
+  ponte?: { base: string; chaveEnv: string; chaveEm: string | null; gratis: boolean };
 };
 
 /**
@@ -138,6 +140,19 @@ export type TipoTarefa = {
 export type No = { nome: string; caminho: string; dir: boolean; filhos?: No[] };
 
 async function json<T>(res: Response): Promise<T> {
+  // Uma resposta que não é JSON quase sempre quer dizer que o servidor em
+  // execução é mais antigo que esta tela. O `web/dist` é lido do disco a cada
+  // pedido, então a interface se atualiza sozinha depois de um build enquanto
+  // o processo continua sendo o de antes — e a rota nova cai na página 404 do
+  // Express, que é HTML. Sem isto a tela dizia "Unexpected token '<'", que não
+  // diz a ninguém o que fazer.
+  if (!res.headers.get("content-type")?.includes("application/json")) {
+    throw new Error(
+      res.status === 404
+        ? "O servidor do cockpit está desatualizado: esta tela pede uma rota que ele ainda não tem. Feche o cockpit e rode `npm start` de novo."
+        : `O servidor respondeu ${res.status} sem JSON. Olhe o terminal onde o cockpit está rodando.`,
+    );
+  }
   const body = await res.json();
   if (!res.ok) throw new Error(body.error ?? res.statusText);
   return body as T;
@@ -377,6 +392,55 @@ export const instalarProvedorMedia = (id: string) =>
   post(`/api/media/${id}/instalar`, {}).then(
     json<{ saida: string; provedores: MediaProvider[] }>,
   );
+
+// ---------------------------------------------------------------------------
+// pontes — provedores que são API, não programa (OpenRouter e afins)
+// ---------------------------------------------------------------------------
+
+export type ModeloPonte = {
+  id: string;
+  nome: string;
+  contexto: number | null;
+  /** Sem ferramentas o modelo não roda um agente: só conversa. */
+  ferramentas: boolean;
+  gratis: boolean;
+};
+
+export type StatusPonte = {
+  id: string;
+  label: string;
+  base: string;
+  baseDisponivel: boolean;
+  baseUrl: string;
+  chaveEnv: string;
+  chaveEm: string | null;
+  pronto: boolean;
+  falta: string | null;
+  chaveUrl: string | null;
+  modelos: ModeloPonte[];
+  modelo: string | null;
+  agentes: string[];
+  catalogoEm: number | null;
+  nota: string | null;
+};
+
+export type TestePonte = { ok: boolean; detalhe: string; ms: number; modelo: string };
+
+export const fetchPontes = () => fetch("/api/pontes").then(json<{ pontes: StatusPonte[] }>);
+
+export const salvarChavePonte = (id: string, chave: string) =>
+  post(`/api/pontes/${id}/chave`, { chave }).then(json<{ ok: true }>);
+
+export const sincronizarModelosPonte = (id: string) =>
+  post(`/api/pontes/${id}/modelos`, {}).then(
+    json<{ modelos: ModeloPonte[]; status: StatusPonte }>,
+  );
+
+export const testarPonte = (id: string, modelo?: string) =>
+  post(`/api/pontes/${id}/testar`, { modelo }).then(json<TestePonte>);
+
+export const definirModeloPonte = (id: string, modelo: string) =>
+  post(`/api/pontes/${id}/modelo`, { modelo }).then(json<{ ok: true }>);
 
 export type Janela = { rotulo: string; usadoPct: number; voltaEm: number | null };
 

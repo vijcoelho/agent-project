@@ -4,20 +4,23 @@ import { Skills } from "./Skills.tsx";
 import { Marketplace } from "./Marketplace.tsx";
 import { Receitas } from "./Receitas.tsx";
 import { Media } from "./Media.tsx";
+import { Gratis } from "./Gratis.tsx";
 import type { AgentSpec, SquadSpec, TipoTarefa } from "./api.ts";
 
 /**
  * Tudo o que se configura mora atrás de uma engrenagem só.
  *
  * A ordem das abas segue o caminho de quem chega: primeiro conecto os
- * provedores, depois pego skills no marketplace, olho o acervo, guardo as
- * formações que funcionaram e por fim ligo o que gera imagem e vídeo.
+ * provedores que já pago, depois ligo os de graça, pego skills no
+ * marketplace, olho o acervo, guardo as formações que funcionaram e por fim
+ * ligo o que gera imagem e vídeo.
  */
 
-type Aba = "provedores" | "marketplace" | "skills" | "receitas" | "media";
+type Aba = "provedores" | "gratis" | "marketplace" | "skills" | "receitas" | "media";
 
 const ABAS: { id: Aba; label: string }[] = [
   { id: "provedores", label: "Provedores" },
+  { id: "gratis", label: "Grátis" },
   { id: "marketplace", label: "Marketplace" },
   { id: "skills", label: "Skills" },
   { id: "receitas", label: "Receitas" },
@@ -63,6 +66,7 @@ export function Ajustes({
 
       <div className="aba-corpo" role="tabpanel">
         {aba === "provedores" && <Config onFechar={onFechar} onMudou={onMudou} />}
+        {aba === "gratis" && <Gratis onMudou={onMudou} />}
         {aba === "marketplace" && <Marketplace onMudou={onMudou} />}
         {aba === "skills" && <Skills agents={agents} />}
         {aba === "receitas" && (

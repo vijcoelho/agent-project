@@ -12,6 +12,24 @@ function Escolha({ value, providers, onChange }: { value: Execucao; providers: P
     <label>Esforço<select className="campo" value={value.effort} onChange={e => onChange({ ...value, effort: e.target.value })}>{(provider?.efforts ?? ["low", "medium", "high"]).map(e => <option key={e}>{e}</option>)}</select></label>
   </div>;
 }
+/**
+ * O que chega da rede não é confiável só por ter vindo com status 200.
+ *
+ * Um servidor de outra versão respondendo `[]` nesta rota fazia
+ * `dados.providers.filter` estourar durante a renderização — e como esta tela
+ * mora dentro do modal do maestro, o erro subia até o topo e trocava o cockpit
+ * inteiro pela página de "a tela quebrou". Um formato inesperado tem que virar
+ * um aviso nesta seção, não um tombo do aplicativo.
+ */
+function conferir(d: unknown): Dados {
+  const ok = d !== null && typeof d === "object" && !Array.isArray(d)
+    && Array.isArray((d as Dados).providers)
+    && !!(d as Dados).agents && typeof (d as Dados).agents === "object"
+    && !!(d as Dados).politica;
+  if (!ok) throw Error("O servidor respondeu a configuração de IA num formato que esta tela não entende. Reinicie o servidor e recarregue a janela.");
+  return d as Dados;
+}
+
 export function PoliticaIA({ onChanged }: { onChanged: () => void }) {
   const [dados, setDados] = useState<Dados | null>(null);
   const [politica, setPolitica] = useState<Politica>({ modo: "padrao" });
@@ -23,7 +41,7 @@ export function PoliticaIA({ onChanged }: { onChanged: () => void }) {
     void fetch("/api/politica-ia", { signal: controller.signal }).then(async r => {
       if (!r.ok || !r.headers.get("content-type")?.includes("application/json")) throw Error("Reinicie o servidor para carregar a configuração de IA.");
       return r.json() as Promise<Dados>;
-    }).then(d => { setDados(d); setPolitica(d.politica); }).catch(e => { if (!controller.signal.aborted) setError(String(e)); });
+    }).then(d => { setDados(conferir(d)); setPolitica(d.politica); }).catch(e => { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : String(e)); });
     return () => controller.abort();
   }, []);
   const change = (p: Politica) => { setPolitica(p); setNotice(""); };

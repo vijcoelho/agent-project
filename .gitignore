@@ -3,3 +3,6 @@ web/dist
 
 .cockpit
 .cockpit-worktrees
+
+# Logs de execução do servidor, quando você o inicia redirecionando a saída.
+*.log

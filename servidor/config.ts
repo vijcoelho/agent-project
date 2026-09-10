@@ -1,7 +1,45 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-export type CliSpec = { command: string; args?: string[] };
+/**
+ * Ponte: um provedor que é uma API, não um programa. O cockpit empresta o
+ * binário de outro CLI (`command`) e aponta ele para outro servidor. Assim o
+ * OpenRouter — e qualquer endpoint compatível — vira um painel normal.
+ */
+export type PonteSpec = {
+  /** Nome do provedor dentro do CLI base (model_providers.<id>). */
+  provider?: string;
+  label?: string;
+  base_url: string;
+  /** Variável de ambiente onde a chave entra, só no processo do painel. */
+  chaveEnv: string;
+  /** "responses" é o padrão; o Codex 0.154 não aceita mais "chat". */
+  wireApi?: string;
+  /** Cabeçalhos fixos — o OpenRouter usa para saber de onde vem o tráfego. */
+  headers?: Record<string, string>;
+  /** Onde buscar o catálogo, quando não é <base_url>/models. */
+  catalogo?: string;
+  /** Endpoint que informa crédito e limite, quando o provedor tem um. */
+  cota?: string;
+  /** Página onde se cria a chave, para a tela poder mandar você direto. */
+  chaveUrl?: string;
+  /** Só listar modelos de preço zero. É isto que faz a aba "Grátis". */
+  soGratis?: boolean;
+  /** Ajustes soltos do CLI base, em pares chave=valor de configuração. */
+  extra?: Record<string, string>;
+  nota?: string;
+};
+
+export type CliSpec = {
+  command: string;
+  args?: string[];
+  /**
+   * De que família este CLI é. Ausente = ele mesmo. Serve para um provedor
+   * que roda pelo binário de outro herdar o mesmo tratamento de argumentos.
+   */
+  familia?: string;
+  ponte?: PonteSpec;
+};
 
 export type AgentSpec = {
   label: string;

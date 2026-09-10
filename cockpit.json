@@ -2,6 +2,9 @@
   "_leia": [
     "Painel de controle do cockpit. Mexa a vontade e reinicie o servidor.",
     "clis             = os programas que o cockpit sabe lancar.",
+    "clis[].ponte    = provedor que e API, nao programa: roda pelo binario de",
+    "                  outro CLI apontado para outra base_url. E assim que o",
+    "                  OpenRouter entra com modelos de preco zero.",
     "instrucoesGerais = vai no prompt de TODO agente. Bom para fatos da maquina.",
     "harness.tipos    = o TIPO da tarefa decide modelo e esforco, nao o agente.",
     "                   porCli escolhe o modelo equivalente em cada provedor:",
@@ -31,6 +34,25 @@
     },
     "codex": {
       "command": "codex"
+    },
+    "openrouter": {
+      "command": "codex",
+      "familia": "codex",
+      "ponte": {
+        "provider": "openrouter",
+        "label": "OpenRouter",
+        "base_url": "https://openrouter.ai/api/v1",
+        "chaveEnv": "OPENROUTER_API_KEY",
+        "wireApi": "responses",
+        "chaveUrl": "https://openrouter.ai/settings/keys",
+        "cota": "https://openrouter.ai/api/v1/key",
+        "soGratis": true,
+        "headers": {
+          "HTTP-Referer": "https://github.com/cockpit",
+          "X-Title": "Cockpit"
+        },
+        "nota": "modelos de preço zero, com o limite diário que o OpenRouter aplica à conta gratuita. A chave é sua e fica cifrada em ~/.cockpit."
+      }
     }
   },
   "modelos": {
@@ -54,6 +76,27 @@
       "gpt-5.6-luna",
       "gpt-reserve",
       "gpt-5.5"
+    ],
+    "openrouter": [
+      "openrouter/free",
+      "thinkingmachines/inkling-small:free",
+      "thinkingmachines/inkling:free",
+      "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "nvidia/nemotron-3.5-lightning:free",
+      "dots-studio/dots-3-note-preview:free",
+      "google/gemma-4-26b-a4b-it:free",
+      "google/gemma-4-31b-it:free",
+      "inclusionai/ling-3.0-flash-fin:free",
+      "inclusionai/ling-3.0-flash-sante:free",
+      "inclusionai/ling-3.0-flash-vl:free",
+      "nex-agi/nex-n2.5-mini:free",
+      "nex-agi/nex-n2.5-pro:free",
+      "nvidia/nemotron-3-super-120b-a12b:free",
+      "poolside/laguna-s-2.1:free",
+      "poolside/laguna-xs-2.1:free",
+      "cohere/north-mini-code:free",
+      "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "liquid/lfm-2.5-2.6b:free"
     ]
   },
   "agents": {
@@ -179,6 +222,15 @@
       "effort": "high",
       "papel_id": "media",
       "papel": "Você é o CINEASTA. Você planeja a peça inteira antes de gastar uma geração: roteiro, planos, ordem, trilha e narração. Vídeo custa caro e demora, então primeiro gere as imagens-chave com gerar_imagem, aprove-as, e só então anime com gerar_video passando a referência. A narração vem de gerar_audio. Monte a sequência num arquivo de descrição na pasta media/ e diga o que ficou pronto e o que falta. Antes de gerar, chame provedores_de_media. Prefira sempre o provedor de assinatura (Higgsfield) — os de chave de API cobram à parte. Se nenhum estiver pronto, diga exatamente o que falta em vez de tentar."
+    },
+    "gratis": {
+      "label": "GRÁTIS",
+      "cor": "#7bd88f",
+      "cli": "openrouter",
+      "model": "openrouter/free",
+      "effort": "medium",
+      "papel": "Você é o GRÁTIS, rodando um modelo de custo zero pelo OpenRouter. Serve para trabalho volumoso, rascunho, busca em código e primeira versão — o que não vale gastar cota de assinatura. Você é menor que os outros agentes desta missão: prefira passos curtos, confirme o que leu antes de mudar, e devolva a tarefa dizendo o porquê quando ela exigir arquitetura, decisão ambígua ou bug difícil.",
+      "papel_id": "executar"
     }
   },
   "squads": {
@@ -296,6 +348,36 @@
           "tipo": "arquitetura"
         }
       ]
+    },
+    "gratis-revisado": {
+      "label": "Grátis + revisão",
+      "descricao": "O trabalho de volume sai de graça; a revisão é de assinatura.",
+      "fases": [
+        {
+          "nome": "rascunho",
+          "agentes": [
+            "gratis"
+          ],
+          "tipo": "implementar",
+          "roster": {
+            "gratis": {
+              "cli": "openrouter"
+            }
+          }
+        },
+        {
+          "nome": "revisão",
+          "agentes": [
+            "reviewer"
+          ],
+          "tipo": "auditoria",
+          "roster": {
+            "reviewer": {
+              "cli": "claude"
+            }
+          }
+        }
+      ]
     }
   },
   "precos": {
@@ -348,6 +430,10 @@
           "codex": {
             "model": "gpt-5.6-luna",
             "effort": "low"
+          },
+          "openrouter": {
+            "model": "openrouter/free",
+            "effort": "low"
           }
         }
       },
@@ -366,6 +452,10 @@
           "codex": {
             "model": "gpt-5.6-luna",
             "effort": "low"
+          },
+          "openrouter": {
+            "model": "openrouter/free",
+            "effort": "medium"
           }
         }
       },
@@ -383,6 +473,10 @@
           },
           "codex": {
             "model": "gpt-5.6-terra",
+            "effort": "medium"
+          },
+          "openrouter": {
+            "model": "openrouter/free",
             "effort": "medium"
           }
         }
@@ -438,6 +532,10 @@
           "codex": {
             "model": "gpt-6-astra",
             "effort": "xhigh"
+          },
+          "openrouter": {
+            "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+            "effort": "high"
           }
         }
       },
@@ -455,6 +553,10 @@
           },
           "codex": {
             "model": "gpt-6-astra",
+            "effort": "high"
+          },
+          "openrouter": {
+            "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
             "effort": "high"
           }
         }
@@ -491,6 +593,10 @@
           "codex": {
             "model": "gpt-reserve",
             "effort": "low"
+          },
+          "openrouter": {
+            "model": "openrouter/free",
+            "effort": "low"
           }
         }
       }
@@ -516,6 +622,11 @@
       "xhigh",
       "max",
       "ultra"
+    ],
+    "openrouter": [
+      "low",
+      "medium",
+      "high"
     ]
   },
   "media": {
@@ -739,6 +850,33 @@
       "paineis": 1,
       "elenco": {
         "clis": [
+          "claude"
+        ]
+      },
+      "daCasa": true
+    },
+    "de-graca": {
+      "label": "De graça",
+      "descricao": "Só modelos de custo zero, pelo OpenRouter. Nenhuma assinatura é consumida; em troca, o modelo é menor.",
+      "modo": "agentico",
+      "tipo": "implementar",
+      "paineis": 1,
+      "elenco": {
+        "clis": [
+          "openrouter"
+        ]
+      },
+      "daCasa": true
+    },
+    "gratis-com-revisao": {
+      "label": "Grátis faz, pago revisa",
+      "descricao": "O modelo grátis escreve o volume e o Claude revisa. Gasta pouca assinatura e não entrega código sem uma segunda leitura.",
+      "modo": "squad",
+      "squad": "gratis-revisado",
+      "paineis": 2,
+      "elenco": {
+        "clis": [
+          "openrouter",
           "claude"
         ]
       },
