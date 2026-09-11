@@ -20,7 +20,7 @@ function daqui(ms: number): string {
   return h < 24 ? `${h}h${min % 60 ? String(min % 60).padStart(2, "0") : ""}` : `${Math.round(h / 24)}d`;
 }
 
-export function Redline() {
+export function Redline({ compact = false }: { compact?: boolean }) {
   const [cotas, setCotas] = useState<Cota[]>([]);
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export function Redline() {
 
   return (
     <span className="redline" role="status" aria-label="Cota das assinaturas">
-      {cotas.map((c) => {
+      {cotas.filter(c => !compact || c.estado === "bloqueado" || c.estado === "apertado").map((c) => {
         // A janela mais apertada é a que manda: é ela que te bloqueia.
         const pior = c.janelas.length
           ? c.janelas.reduce((a, b) => (a.usadoPct >= b.usadoPct ? a : b))

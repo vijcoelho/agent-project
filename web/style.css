@@ -1,14 +1,12 @@
 /* ==========================================================================
-   COCKPIT — preto total, azul neon.
-
-   Para mudar a cara inteira, mexa só no bloco AJUSTES abaixo.
-   Trocar --neon troca o acento do produto todo.
+   COCKPIT — superfícies neutras, identidade por agente.
+   Os aliases --neon preservam os componentes existentes durante a migração.
    ========================================================================== */
 
 :root {
   /* ---- AJUSTES: é aqui que se mexe ---- */
-  --neon: #4195ff;
-  --raio: 7px;
+  --neon: #f5f5f5;
+  --raio: 12px;
   --densidade: 1; /* 0.9 aperta tudo, 1.1 dá respiro */
   --fonte-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   --fonte-mono: "Cascadia Mono", "Cascadia Code", Consolas, monospace;
@@ -19,33 +17,33 @@
   --neon-fio: color-mix(in srgb, var(--neon) 16%, transparent);
   --neon-fundo: color-mix(in srgb, var(--neon) 12%, transparent);
   --neon-vidro: color-mix(in srgb, var(--neon) 7%, transparent);
-  --brilho: 0 0 14px color-mix(in srgb, var(--neon) 30%, transparent);
-  --brilho-forte: 0 0 8px color-mix(in srgb, var(--neon) 65%, transparent);
+  --brilho: 0 4px 16px #0003;
+  --brilho-forte: 0 4px 12px #0004;
 
   /* ---- superfícies ---- */
-  --preto: #050608;
-  --carta: #060708;
-  --barra: #0c0e12;
-  --fio: #1b2029;
-  --fio-forte: #2b3442;
+  --preto: #080808;
+  --carta: #141414;
+  --barra: #1c1c1c;
+  --fio: #303030;
+  --fio-forte: #565656;
 
   /* ---- tinta ---- */
-  --ink: #e6edf3;
-  --ink-2: #a8b2c2;
-  --ink-3: #8b98ab;
-  --ink-4: #78869a;
+  --ink: #f5f5f5;
+  --ink-2: #b8b8b8;
+  --ink-3: #a3a3a3;
+  --ink-4: #969696;
 
   /* ---- sinais ---- */
   --alerta: #e0a33a;
   --ok: #3ecf8e;
 
   /* ---- escala ---- */
-  --t-nano: 9.5px;
-  --t-mini: 11px;
-  --t-base: 12px;
-  --t-med: 13px;
+  --t-nano: 11px;
+  --t-mini: 12px;
+  --t-base: 13px;
+  --t-med: 14px;
   --gap: calc(8px * var(--densidade));
-  --pad: calc(10px * var(--densidade));
+  --pad: calc(14px * var(--densidade));
 
   --pane: var(--neon);
 }
@@ -176,7 +174,7 @@ button, select, input, textarea { font: inherit; color: inherit; }
 .nota .quem { flex: none; color: var(--neon); font-family: var(--fonte-mono); font-size: var(--t-nano); }
 .nota .texto { flex: 1; min-width: 0; color: var(--ink-2); }
 .nota .icon-btn { flex: none; font-size: 11px; opacity: 0; }
-.nota:hover .icon-btn { opacity: 1; }
+.nota:hover .icon-btn, .nota:focus-within .icon-btn { opacity: 1; }
 
 /* ---- formulários ---- */
 
@@ -289,7 +287,7 @@ button, select, input, textarea { font: inherit; color: inherit; }
   border-color: var(--pane);
   color: #000;
   font-weight: 650;
-  box-shadow: 0 0 12px color-mix(in srgb, var(--pane) 35%, transparent);
+  box-shadow: none;
 }
 .btn.solid:hover:not(:disabled) { filter: brightness(1.15); color: #000; }
 .btn.quiet { border-color: transparent; background: none; color: var(--ink-4); }
@@ -397,7 +395,7 @@ button, select, input, textarea { font: inherit; color: inherit; }
 .pane:focus-within {
   border-color: color-mix(in srgb, var(--pane) 45%, transparent);
   border-top-color: var(--pane);
-  box-shadow: 0 0 16px color-mix(in srgb, var(--pane) 22%, transparent);
+  box-shadow: none;
 }
 
 .pane-head {
@@ -421,7 +419,7 @@ button, select, input, textarea { font: inherit; color: inherit; }
   min-height: 1px;
   border-radius: 0.5px;
   background: var(--pane);
-  box-shadow: 0 0 4px color-mix(in srgb, var(--pane) 50%, transparent);
+  box-shadow: none;
 }
 .spark i.zero { background: var(--fio-forte); box-shadow: none; }
 
@@ -961,7 +959,7 @@ button, select, input, textarea { font: inherit; color: inherit; }
   border-radius: 50%;
   background: var(--ink-4);
 }
-.prov.on .prov-luz { background: var(--ok); box-shadow: 0 0 7px var(--ok); }
+.prov.on .prov-luz { background: var(--ok); box-shadow: none; }
 
 .prov-corpo { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
 .prov-corpo b { color: var(--ink); font-size: var(--t-med); font-weight: 600; }
@@ -1003,14 +1001,14 @@ button, select, input, textarea { font: inherit; color: inherit; }
   max-height: calc(100dvh - 48px);
   padding: 0;
   margin: auto;
-  border: 1px solid #34445d;
-  border-radius: 12px;
+  border: 1px solid var(--fio);
+  border-radius: 22px;
   background: var(--carta);
   color: var(--ink);
   box-shadow: 0 24px 90px #000b;
   overflow: hidden;
 }
-.modal-window::backdrop { background: #02050bcc; }
+.modal-window::backdrop { background: #000b; }
 .modal-window > .wizard,
 .modal-window > .config,
 .modal-window > .consumo {
@@ -1039,7 +1037,7 @@ button, select, input, textarea { font: inherit; color: inherit; }
 :root { color-scheme: dark; }
 button { touch-action: manipulation; }
 svg { flex-shrink: 0; vertical-align: middle; }
-* { scrollbar-width: thin; scrollbar-color: #2b3442 transparent; }
+* { scrollbar-width: thin; scrollbar-color: #565656 transparent; }
 :focus-visible { outline: 1px solid var(--neon); outline-offset: 2px; }
 
 /* ---- a barra única ---- */
@@ -1069,7 +1067,7 @@ svg { flex-shrink: 0; vertical-align: middle; }
   font-size: var(--t-mini);
 }
 .headline .sep { flex: none; width: 1px; height: 16px; background: var(--fio); margin: 0 1px; }
-.btn, .picker { min-height: 24px; padding: 2px 8px; font-size: var(--t-mini); }
+.btn, .picker { min-height: 36px; padding: 7px 12px; font-size: var(--t-base); }
 .picker { max-width: 190px; }
 .btn.solid { background: var(--neon); border-color: var(--neon); color: #000; font-weight: 600; }
 .btn.solid:hover:not(:disabled) { color: #000; box-shadow: var(--brilho); }
@@ -1079,8 +1077,8 @@ svg { flex-shrink: 0; vertical-align: middle; }
   display: inline-flex;
   justify-content: center;
   align-items: center;
-  min-width: 24px;
-  min-height: 24px;
+  min-width: 36px;
+  min-height: 36px;
   border: 0;
   border-radius: 4px;
   background: none;
@@ -1110,7 +1108,7 @@ svg { flex-shrink: 0; vertical-align: middle; }
 .connection { display: flex; align-items: center; gap: 5px; flex: none; white-space: nowrap; font-size: 10px; color: var(--alerta); }
 .connection i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
 .connection.connected { color: var(--ok); }
-.connection.connected i { box-shadow: 0 0 6px color-mix(in srgb, var(--ok) 55%, transparent); }
+.connection.connected i { box-shadow: none; }
 
 /* ---- barra lateral ---- */
 
@@ -1123,22 +1121,22 @@ svg { flex-shrink: 0; vertical-align: middle; }
    O último painel de uma fileira incompleta se estica: buraco preto ao lado
    de um terminal é espaço roubado do trabalho.                            */
 
-.work { background: var(--fio); }
+.work { background: var(--preto); }
 .panes-wrap { min-height: 0; }
 .panes {
   grid-template-columns: var(--columns);
-  gap: 1px;
+  gap: 10px;
   padding: 0;
-  background: var(--fio);
-  grid-auto-rows: minmax(150px, 1fr);
+  background: none;
+  grid-auto-rows: minmax(240px, 1fr);
   overflow: auto;
 }
-.panes[data-colunas="2"] > .pane:last-child:nth-child(2n-1) { grid-column: span 2; }
-.panes[data-colunas="3"] > .pane:last-child:nth-child(3n-2) { grid-column: span 3; }
-.panes[data-colunas="3"] > .pane:last-child:nth-child(3n-1) { grid-column: span 2; }
+.panes[data-colunas="2"] > .pane:nth-last-child(1 of :not([hidden])):nth-child(2n-1 of :not([hidden])) { grid-column: span 2; }
+.panes[data-colunas="3"] > .pane:nth-last-child(1 of :not([hidden])):nth-child(3n-2 of :not([hidden])) { grid-column: span 3; }
+.panes[data-colunas="3"] > .pane:nth-last-child(1 of :not([hidden])):nth-child(3n-1 of :not([hidden])) { grid-column: span 2; }
 
-.pane { border: 0; border-top: 2px solid var(--pane); border-radius: 0; }
-.pane:focus-within { border-top-color: var(--pane); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pane) 28%, transparent); }
+.pane { border: 1px solid var(--fio); border-radius: 18px; }
+.pane:focus-within { border-color: #686868; box-shadow: none; }
 
 .pane-head {
   min-height: 22px;
@@ -1150,7 +1148,7 @@ svg { flex-shrink: 0; vertical-align: middle; }
 }
 .pane-head .luz { flex: none; width: 5px; height: 5px; border-radius: 50%; background: var(--pane); }
 .pane-head .luz.parada { background: none; box-shadow: inset 0 0 0 1px var(--fio-forte); }
-.pane-head .who { font-size: var(--t-mini); font-weight: 650; letter-spacing: 0.01em; }
+.pane-head .who { font-size: var(--t-base); font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
 .pane-head .model {
   min-width: 0;
   overflow: hidden;
@@ -1182,7 +1180,7 @@ svg { flex-shrink: 0; vertical-align: middle; }
 
 .partida { flex: 1; gap: 12px; padding: 0 32px; background: none; }
 .partida h2 { font-size: 15px; font-weight: 550; letter-spacing: 0; color: var(--ink-2); }
-.botao-grande { margin-top: 0; min-height: 30px; padding: 6px 18px; font-size: var(--t-base); border-radius: 5px; }
+.botao-grande { margin-top: 8px; min-height: 44px; padding: 10px 20px; font-size: var(--t-base); border-radius: 12px; background: var(--ink); color: var(--preto); }
 .rodape-partida { margin: 2px 0 0; max-width: 46ch; font-size: var(--t-mini); line-height: 1.6; }
 .rodape-partida strong { color: var(--neon); font-weight: 600; }
 
@@ -1201,7 +1199,6 @@ svg { flex-shrink: 0; vertical-align: middle; }
 .carta.on { box-shadow: inset 0 0 0 1px var(--neon-linha); }
 
 @media (max-width: 1100px) {
-  .lateral { width: 190px; }
   .headline .objetivo { display: none; }
   .work.dividido { flex-direction: column; }
   .work.dividido .panes-wrap { flex: 1 1 50%; }
@@ -1210,7 +1207,6 @@ svg { flex-shrink: 0; vertical-align: middle; }
 
 @media (max-width: 760px) {
   .deck { position: relative; }
-  .lateral { position: absolute; z-index: 10; inset: 0 auto 0 0; width: 230px; box-shadow: 14px 0 36px #000a; }
   .headline .branch, .headline .cols, .headline .sep { display: none; }
   .picker { max-width: 130px; }
   .panes { grid-template-columns: 1fr !important; }
@@ -1415,7 +1411,7 @@ svg { flex-shrink: 0; vertical-align: middle; }
 /* O tipo é a peça que decide modelo e esforço: é a que merece a cor. */
 .receita-pecas .peca-tipo { background: var(--neon-fundo); color: var(--neon); }
 .receita .apagar { opacity: 0; }
-.receita:hover .apagar { opacity: 1; }
+.receita:hover .apagar, .receita:focus-within .apagar { opacity: 1; }
 
 .receitas-linha { max-height: 30vh; overflow: auto; }
 
@@ -1489,19 +1485,8 @@ svg { flex-shrink: 0; vertical-align: middle; }
 .fio-v { flex: none; width: 1px; height: 15px; background: var(--fio); }
 .icon-btn.on { background: var(--neon-fundo); color: var(--neon); }
 
-/* ---- painel de arquivos e memória ---- */
+/* ---- árvore de arquivos e notas de memória ---- */
 
-.lateral {
-  display: flex;
-  flex-direction: column;
-  flex: none;
-  width: 232px;
-  min-height: 0;
-  background: var(--preto);
-  border-right: 1px solid var(--fio);
-}
-.lateral .abas { padding: 0 4px 0 6px; }
-.lateral .aba { padding: 6px 8px; font-size: var(--t-mini); }
 .lateral-corpo { flex: 1; min-height: 0; overflow: auto; padding-bottom: 8px; }
 
 .aba .count {
@@ -1578,7 +1563,7 @@ svg { flex-shrink: 0; vertical-align: middle; }
 
 /* ---- tela inicial: um botão, e mais nada ---- */
 
-.partida h2 { font-size: 16px; }
+.partida h2 { font-size: 26px; font-weight: 600; color: var(--ink); letter-spacing: -0.025em; }
 .cockpit:not(:has(.headline h1)) .gauges .gauge:not(.raiz) { display: none; }
 
 @media (max-width: 760px) {
@@ -1592,7 +1577,7 @@ svg { flex-shrink: 0; vertical-align: middle; }
 
 /* O cinza das divisas é para os vãos entre terminais, não para o fundo. */
 .work { background: var(--preto); }
-.panes { background: var(--fio); }
+.panes { background: transparent; }
 
 /* Sem projeto não há o que medir: a régua some em vez de virar faixa vazia. */
 .cockpit:not(:has(.panes-wrap)) .gauges,

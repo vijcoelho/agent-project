@@ -13,6 +13,10 @@ const paths = {
   memory: "M5 4h14v16H5zM9 8h6M9 12h6M9 16h3",
   chart: "M4 3v17h17M8 16v-5M13 16V7M18 16V4",
   menu: "M4 6h16M4 12h16M4 18h16",
+  back: "M19 12H5m6-6-6 6 6 6",
+  chevron: "m7 10 5 5 5-5",
+  close: "m6 6 12 12M6 18 18 6",
+  agent: "M8 4h8l4 5v9l-4 2H8l-4-2V9zM9 10v3m6-3v3M9 16h6M12 4V2",
 };
 
 export function Icon({ name, size = 18, style }: { name: keyof typeof paths; size?: number; style?: CSSProperties }) {

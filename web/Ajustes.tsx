@@ -5,6 +5,7 @@ import { Marketplace } from "./Marketplace.tsx";
 import { Receitas } from "./Receitas.tsx";
 import { Media } from "./Media.tsx";
 import { Gratis } from "./Gratis.tsx";
+import type { Colunas } from "./PaneGrid.tsx";
 import type { AgentSpec, SquadSpec, TipoTarefa } from "./api.ts";
 
 /**
@@ -13,10 +14,12 @@ import type { AgentSpec, SquadSpec, TipoTarefa } from "./api.ts";
  * A ordem das abas segue o caminho de quem chega: primeiro conecto os
  * provedores que já pago, depois ligo os de graça, pego skills no
  * marketplace, olho o acervo, guardo as formações que funcionaram e por fim
- * ligo o que gera imagem e vídeo.
+ * ligo o que gera imagem e vídeo. Tela fica por último: é preferência de
+ * quem já está trabalhando, e saiu da tela principal justamente para não
+ * disputar espaço com o terminal.
  */
 
-type Aba = "provedores" | "gratis" | "marketplace" | "skills" | "receitas" | "media";
+type Aba = "provedores" | "gratis" | "marketplace" | "skills" | "receitas" | "media" | "tela";
 
 const ABAS: { id: Aba; label: string }[] = [
   { id: "provedores", label: "Provedores" },
@@ -25,6 +28,7 @@ const ABAS: { id: Aba; label: string }[] = [
   { id: "skills", label: "Skills" },
   { id: "receitas", label: "Receitas" },
   { id: "media", label: "Media" },
+  { id: "tela", label: "Tela" },
 ];
 
 export function Ajustes({
@@ -32,6 +36,8 @@ export function Ajustes({
   agents,
   squads,
   tarefas,
+  colunas,
+  onColunas,
   onFechar,
   onMudou,
 }: {
@@ -39,6 +45,8 @@ export function Ajustes({
   agents: Record<string, AgentSpec>;
   squads: Record<string, SquadSpec>;
   tarefas: Record<string, TipoTarefa>;
+  colunas: Colunas;
+  onColunas: (colunas: Colunas) => void;
   onFechar: () => void;
   onMudou: () => void;
 }) {
@@ -73,6 +81,30 @@ export function Ajustes({
           <Receitas agents={agents} squads={squads} tarefas={tarefas} onMudou={onMudou} />
         )}
         {aba === "media" && <Media />}
+        {aba === "tela" && (
+          <div className="wizard-corpo">
+            <div className="campo-bloco">
+              <span className="rotulo">Colunas de terminal</span>
+              <p className="dica">
+                No automático, um agente sozinho usa a tela toda, até quatro dividem em duas
+                colunas e daí em diante são três. Fixe um número se preferir sempre o mesmo
+                arranjo.
+              </p>
+              <span className="cols" role="group" aria-label="Colunas dos terminais">
+                {(["auto", "1", "2", "3"] as const).map((c) => (
+                  <button
+                    key={c}
+                    className={colunas === c ? "on" : undefined}
+                    aria-pressed={colunas === c}
+                    onClick={() => onColunas(c)}
+                  >
+                    {c === "auto" ? "Auto" : c}
+                  </button>
+                ))}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

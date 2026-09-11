@@ -2,6 +2,7 @@ import { Component, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "@xterm/xterm/css/xterm.css";
 import "./style.css";
+import "./islands.css";
 import { App } from "./App.tsx";
 
 /**

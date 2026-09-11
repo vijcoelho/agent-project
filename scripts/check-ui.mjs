@@ -38,7 +38,7 @@ try {
     if (path === '/api/maestro' || path === '/api/maestro/refresh') return route.fulfill({ json: maestroSettings });
     if (path === '/api/politica-ia') return route.fulfill({ json: politicaIA });
     if (path.startsWith('/api/pontes')) return route.fulfill({ json: route.request().method() === 'POST' ? { ok: true } : { pontes } });
-    const data = path === '/api/config' ? { agents: { maestro: { label: 'Maestro', cli: 'claude', cor: '#4195ff' } }, squads: {}, tarefas: {}, providers: [] }
+    const data = path === '/api/config' ? { agents: { maestro: { label: 'Maestro', cli: 'claude', cor: '#00b4ff', maestro: true }, piloto: { label: 'Piloto', cli: 'claude', cor: '#e2703a', papel: 'Executa a tarefa direto' }, builder: { label: 'Builder', cli: 'claude', cor: '#4fb286', papel: 'Constroi e testa' }, artista: { label: 'Artista', cli: 'agy', cor: '#d9a441', papel: 'Imagens e video' } }, squads: {}, tarefas: {}, providers: [] }
       : path === '/api/projects' ? { projects } : path === '/api/missions' ? { missions }
       : path === '/api/providers' ? { providers: [], presets: [] }
       : path === '/api/consumo' ? { claude: { total: usage, porModelo: [], porDia: [], sessoes: 0, desde: null }, agy: { conversas: 0, pedidos: 0, ultima: null } }
@@ -50,12 +50,13 @@ try {
     return route.fulfill({ json: data });
   });
   let socket;
-  await page.routeWebSocket('**/ws', ws => { socket = ws; });
+  const clientMessages = [];
+  await page.routeWebSocket('**/ws', ws => { socket = ws; ws.onMessage(data => clientMessages.push(JSON.parse(String(data)))); });
   const url = `http://127.0.0.1:${server.address().port}`;
   await page.goto(url);
   await page.getByRole('button', { name: 'Abrir projeto', exact: true }).waitFor();
   await page.screenshot({ path: 'web/ui-desktop.png', fullPage: true });
-  assert.equal(await page.locator('.lateral').count(), 0, 'a lateral nao aparece sem projeto');
+  assert.equal(await page.locator('.sidebar-paginas').count(), 0, 'sem projeto nao ha pagina de arquivos');
   assert.equal(await page.getByRole('button', { name: 'Abrir projeto', exact: true }).count(), 1, 'so um botao diz Abrir projeto');
   projects = [{ id: 'p1', nome: 'Meu projeto', root: 'C:/projetos/exemplo', git: true }];
   missions = [{ id: 'm1', projectId: 'p1', nome: 'Interface do cockpit', objetivo: 'Refinar a experiência', branch: 'missao/interface', git: { dirty: 0, head: 'abc123' }, usage, panes: [], squad: null }];
@@ -67,26 +68,112 @@ try {
   assert.equal(await page.locator('.linha-toque').count(), 2, 'um projeto e uma missão na janela');
   await page.getByRole('button', { name: 'Fechar projetos', exact: true }).click();
   assert.equal(await page.getByRole('dialog').count(), 0);
-  // Arquivos e memória: painel que abre e fecha.
-  await page.getByRole('button', { name: 'Arquivos e memória', exact: true }).click();
-  await page.locator('.lateral').waitFor();
+  // Arquivos e memoria sao a segunda pagina da lateral, nao um painel novo.
+  const paginas = page.getByRole('tablist', { name: 'Páginas da lateral' });
+  await paginas.getByRole('tab', { name: 'Arquivos', exact: true }).click();
+  await page.locator('.arquivos-pagina').waitFor();
+  assert.equal(await page.locator('.mission-row').count(), 0, 'a pagina de arquivos substitui a de missoes na ilha');
   await page.getByRole('tab', { name: /Memória/ }).click();
-  await page.getByRole('button', { name: 'Fechar arquivos', exact: true }).click();
-  assert.equal(await page.locator('.lateral').count(), 0);
-  panes = [1, 2, 3].map(n => ({ paneId: `pane${n}`, agent: 'maestro', label: 'Maestro', cor: '#4195ff', missionId: 'm1', status: 'idle', atividade: [], iniciadoEm: Date.now(), usage }));
+  await paginas.getByRole('tab', { name: 'Missões', exact: true }).click();
+  assert.equal(await page.locator('.arquivos-pagina').count(), 0);
+  assert.equal(await page.locator('.sidebar-island').count(), 1, 'as duas paginas dividem a mesma ilha');
+  // Duas missoes coexistem na lateral; a ativa abre com um terminal na tela.
+  missions = [missions[0], { id: 'm2', projectId: 'p1', nome: 'Correcoes da API', objetivo: 'Ajustar contratos', branch: 'missao/api', git: { dirty: 0, head: 'def456' }, usage, panes: [], squad: null }];
+  // Cores e estados variados: o mascote de cada agente e o estado dele precisam aparecer nos screenshots.
+  const cores = ['#b8a1ff', '#e2703a', '#4fb286'];
+  const estados = ['run', 'idle', 'dead'];
+  panes = [1, 2, 3].map(n => ({ paneId: `pane${n}`, agent: 'maestro', label: 'Maestro', cor: cores[n - 1], missionId: 'm1', status: estados[n - 1], atividade: [], iniciadoEm: Date.now(), usage }));
+  panes.push({ paneId: 'pane4', agent: 'maestro', label: 'Maestro', cor: '#8fb8ff', missionId: 'm2', status: 'idle', atividade: [], iniciadoEm: Date.now(), usage });
   await page.reload();
-  await page.locator('.pane').first().waitFor();
+  await page.locator('.mission-row').first().waitFor();
+  assert.equal(await page.locator('.mission-row').count(), 2, 'as duas missoes aparecem na lateral');
+  await page.locator('.pane:visible .xterm').first().waitFor();
+  assert.equal(await page.locator('.pane:visible').count(), 3, 'a missao aberta mostra todos os seus terminais, nao caixinhas');
+  assert.equal(await page.locator('.agent-row').count(), 4, 'a missao ativa lista seus tres agentes e o atalho de adicionar');
+  // Cada agente tem mascote, e o mascote carrega o estado real do painel.
+  assert.equal(await page.locator('.agent-row .mascote').count(), 3, 'cada agente da missao tem um mascote');
+  assert.equal(await page.locator('.agent-row .mascote.e-run').count(), 1, 'so o agente em atividade tem a cara de trabalhando');
+  assert.equal(await page.locator('.agent-row .mascote.e-dead').count(), 1, 'o agente encerrado nao parece vivo');
+  assert.equal(await page.locator('.sidebar-island').count(), 1, 'as missoes vivem numa ilha');
+  await page.screenshot({ path: 'web/ui-lateral.png', fullPage: true });
+  await page.getByRole('button', { name: 'Adicionar agente', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Adicionar agente', exact: true }).waitFor();
+  assert.equal(await page.locator('.agent-choice .mascote').count(), 4, 'cada agente do catalogo tem seu mascote');
+  const formas = await page.locator('.agent-choice .mascote-pele').evaluateAll(els => els.map(el => el.getAttribute('d')));
+  assert.ok(new Set(formas).size > 1, 'os mascotes do catalogo nao sao todos iguais');
+  assert.equal(await page.locator('.agent-choice .mascote.e-run').count(), 0, 'no catalogo ninguem finge estar trabalhando');
+  await page.screenshot({ path: 'web/ui-agentes.png', fullPage: true });
+  await page.getByRole('button', { name: 'Fechar seleção de agente', exact: true }).click();
+  const originalTerminal = await page.locator('[data-pane-id="pane1"] .xterm').elementHandle();
+  socket.send(JSON.stringify({ type: 'output', paneId: 'pane1', data: 'ANTES-DE-TROCAR\r\n' }));
+  // Trocar de agente e depois de missao: a sessao do primeiro segue viva e escondida.
+  await page.getByRole('button', { name: 'Maestro · 2', exact: true }).click();
+  await page.locator('[data-pane-id="pane2"]:visible').waitFor();
+  assert.equal(await page.locator('[data-pane-id="pane2"] .xterm').evaluate(el => el.contains(document.activeElement)), true, 'escolher o agente leva o cursor para o terminal dele');
+  await page.getByRole('button', { name: 'Correcoes da API', exact: true }).click();
+  await page.locator('[data-pane-id="pane4"]:visible').waitFor();
+  assert.equal(await page.locator('.pane:visible').count(), 1, 'a outra missao traz so o terminal dela');
+  assert.equal(await page.locator('[data-pane-id="pane1"]:visible').count(), 0, 'os terminais da missao anterior saem de vista');
+  socket.send(JSON.stringify({ type: 'output', paneId: 'pane1', data: 'DURANTE-OUTRA-MISSAO\r\n' }));
+  await page.getByRole('button', { name: 'Interface do cockpit', exact: true }).click();
+  await page.getByRole('button', { name: 'Maestro · 1', exact: true }).click();
+  await page.locator('[data-pane-id="pane1"]:visible').waitFor();
+  assert.equal(await originalTerminal.evaluate(el => el === document.querySelector('[data-pane-id="pane1"] .xterm')), true, 'voltar preserva a instancia do terminal');
+  await page.waitForFunction(() => /DURANTE-OUTRA-MISSAO/.test(document.querySelector('[data-pane-id="pane1"] .xterm-rows')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
+  const linhas = await page.locator('[data-pane-id="pane1"] .xterm-rows').innerText();
+  assert.match(linhas, /ANTES-DE-TROCAR/, 'a saida anterior a troca continua no terminal');
+  assert.match(linhas, /DURANTE-OUTRA-MISSAO/, 'a saida recebida em outra missao chegou ao terminal');
+  await page.screenshot({ path: 'web/ui-agent-focus.png', fullPage: true });
+  assert.equal(clientMessages.filter(msg => msg.type === 'kill' || msg.type === 'spawn').length, 0, 'navegar nao encerra nem recria agentes');
+  // Doze agentes: a lateral rola, um nome longo nao empurra a largura e o teclado abre.
+  const nomeLongo = 'Especialista em integracao continua e revisao de contratos';
+  panes = Array.from({ length: 12 }, (_, i) => ({ paneId: `muitos${i}`, agent: i === 0 ? 'revisor' : 'maestro', label: i === 0 ? nomeLongo : 'Maestro', cor: '#b8a1ff', missionId: 'm1', status: 'idle', atividade: [], iniciadoEm: Date.now(), usage }));
+  await page.reload();
+  await page.locator('.agent-row').first().waitFor();
+  assert.equal(await page.locator('.agent-row').count(), 13, 'os doze agentes cabem na arvore da missao');
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'doze agentes nao criam rolagem horizontal');
+  assert.equal(await page.locator('.island-corpo').evaluate(el => getComputedStyle(el).overflowY), 'auto', 'a lista de missoes rola em vez de espremer');
+  // As ferramentas ficam na ilha, ancoradas embaixo, mesmo com a lista rolando.
+  assert.equal(await page.locator('.sidebar-island .sidebar-foot').count(), 1, 'as ferramentas moram na ilha');
+  // A ilha e cheia: ocupa a lateral toda, com uma missao ou com doze.
+  assert.equal(await page.locator('.sidebar-island').evaluate(el => el.getBoundingClientRect().height > el.closest('.sidebar').getBoundingClientRect().height * 0.6), true, 'a ilha ocupa a lateral');
+  assert.equal(await page.locator('.agent-row').last().evaluate(el => el.getBoundingClientRect().right <= el.closest('.sidebar').getBoundingClientRect().right + 1), true, 'os nomes ficam dentro da lateral');
+  const largura = await page.locator('.sidebar').boundingBox();
+  assert.ok(largura.width <= 300, `a lateral esticou com o nome longo: ${largura.width}`);
+  const primeiro = page.getByRole('button', { name: nomeLongo, exact: true });
+  await primeiro.focus();
+  await page.keyboard.press('Enter');
+  await page.locator('[data-pane-id="muitos0"]:visible').waitFor();
+  assert.equal(await page.locator('.pane:visible').count(), 12, 'doze agentes abrem doze terminais');
+  missions = [missions[0]];
+  panes = [1, 2, 3].map(n => ({ paneId: `pane${n}`, agent: 'maestro', label: 'Maestro', cor: '#b8a1ff', missionId: 'm1', status: 'idle', atividade: [], iniciadoEm: Date.now(), usage }));
+  await page.reload();
+  await page.locator('.pane:visible').first().waitFor();
+  // Tres agentes aparecem juntos, sem seletor na tela: a grade e automatica.
+  assert.equal(await page.locator('.pane:visible').count(), 3, 'a missao mostra todos os seus terminais');
+  assert.equal(await page.locator('.stage-bar').count(), 0, 'o palco nao tem barra em cima dos terminais');
+  assert.equal(await page.getByRole('group', { name: 'Colunas dos terminais' }).count(), 0, 'o seletor de colunas saiu da tela principal');
+  assert.equal(await page.locator('.panes').evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length), 2, 'tres terminais entram em duas colunas');
+  // Tres painéis em duas colunas: o terceiro estica e nao sobra buraco preto.
+  const larguras = await page.locator('.pane:visible').evaluateAll(els => els.map(el => Math.round(el.getBoundingClientRect().width)));
+  assert.ok(larguras[2] >= larguras[0] + larguras[1] - 2, `terceiro painel nao esticou: ${larguras}`);
+  // Quem quiser fixar colunas acha nos Ajustes, aba Tela.
+  await page.getByRole('button', { name: 'Configurações', exact: true }).click();
+  await page.getByRole('tab', { name: 'Tela', exact: true }).click();
   const colunas = page.getByRole('group', { name: 'Colunas dos terminais' });
   await colunas.getByRole('button', { name: '1', exact: true }).click();
-  assert.equal(await page.locator('.panes').evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length), 1);
-  await colunas.getByRole('button', { name: '2', exact: true }).click();
-  assert.equal(await page.locator('.panes').evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length), 2);
-  // Três painéis em duas colunas: o terceiro estica e não sobra buraco preto.
-  const larguras = await page.locator('.pane').evaluateAll(els => els.map(el => Math.round(el.getBoundingClientRect().width)));
-  assert.ok(larguras[2] >= larguras[0] + larguras[1] - 2, `terceiro painel nao esticou: ${larguras}`);
+  await page.getByRole('button', { name: 'Fechar ajustes', exact: true }).click();
+  assert.equal(await page.locator('.panes').evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length), 1, 'a escolha dos Ajustes vale no palco');
+  await page.getByRole('button', { name: 'Configurações', exact: true }).click();
+  await page.getByRole('tab', { name: 'Tela', exact: true }).click();
+  await colunas.getByRole('button', { name: 'Auto', exact: true }).click();
+  await page.getByRole('button', { name: 'Fechar ajustes', exact: true }).click();
+  assert.equal(await page.locator('.panes').evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length), 2, 'de volta ao automatico');
   await page.screenshot({ path: 'web/ui-workspace.png', fullPage: true });
   const paneBounds = await page.locator('.pane').first().boundingBox();
   await page.getByRole('button', { name: 'Consumo', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Atividade', exact: true }).waitFor();
+  await page.getByRole('button', { name: /Detalhar consumo/ }).click();
   await page.getByRole('dialog', { name: 'Consumo', exact: true }).waitFor();
   await page.getByRole('heading', { name: 'Claude', exact: true }).waitFor();
   assert.deepEqual(await page.locator('.pane').first().boundingBox(), paneBounds);
@@ -95,7 +182,8 @@ try {
   await page.screenshot({ path: 'web/ui-modal.png' });
   await page.keyboard.press('Escape');
   assert.equal(await page.getByRole('dialog').count(), 0);
-  assert.equal(await page.getByRole('button', { name: 'Consumo', exact: true }).evaluate(el => el === document.activeElement), true);
+  // Fechar a camada devolve o foco a quem a abriu, mesmo apos Atividade virar Consumo.
+  assert.equal(await page.getByRole('button', { name: 'Consumo', exact: true }).evaluate(el => el === document.activeElement), true, 'o foco volta para o acionador da camada');
   await page.getByRole('button', { name: 'Configurações', exact: true }).click();
   await page.getByRole('dialog', { name: 'Ajustes', exact: true }).waitFor();
   // As seis abas dos ajustes existem e trocam de conteúdo.
@@ -121,10 +209,11 @@ try {
   await page.unroute('**/api/pontes');
   await page.getByRole('button', { name: 'Fechar ajustes', exact: true }).click();
   await page.getByTitle('Projetos e missões', { exact: true }).click();
-  await page.getByRole('button', { name: 'Nova missão', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Projetos e missões', exact: true }).getByRole('button', { name: 'Nova missão', exact: true }).click();
   await page.getByRole('dialog', { name: 'Nova missão', exact: true }).waitFor();
   assert.deepEqual(await page.locator('.pane').first().boundingBox(), paneBounds);
   await page.getByRole('button', { name: 'Fechar nova missão', exact: true }).click();
+  await page.getByRole('button', { name: 'Detalhes da missão', exact: true }).click();
   await page.getByRole('button', { name: 'Maestro', exact: true }).click();
   await page.getByRole('dialog', { name: 'Maestro e continuidade' }).waitFor();
   await page.getByRole('button', { name: 'Claude Cota não informada', exact: true }).click();
@@ -135,16 +224,18 @@ try {
   // inteiro para a página de "a tela quebrou". Agora é um aviso local.
   await page.getByRole('button', { name: 'Fechar maestro', exact: true }).click();
   await page.route('**/api/politica-ia', route => route.fulfill({ json: [] }));
+  await page.getByRole('button', { name: 'Detalhes da missão', exact: true }).click();
   await page.getByRole('button', { name: 'Maestro', exact: true }).click();
   await page.getByRole('dialog', { name: 'Maestro e continuidade' }).waitFor();
   await page.getByText(/formato que esta tela não entende/).waitFor();
   assert.equal(await page.locator('.tombo').count(), 0, 'formato inesperado não pode derrubar o aplicativo');
   await page.getByRole('button', { name: 'Fechar maestro', exact: true }).click();
   await page.unroute('**/api/politica-ia');
-  // A árvore vive no painel lateral, que agora se abre sob demanda.
-  await page.getByRole('button', { name: 'Arquivos e memória', exact: true }).click();
+  // A arvore vive na pagina Arquivos da lateral; o editor e que divide o palco.
+  await page.getByRole('tablist', { name: 'Páginas da lateral' }).getByRole('tab', { name: 'Arquivos', exact: true }).click();
   await page.getByRole('button', { name: 'exemplo.ts', exact: true }).click();
   await page.locator('.editor-host').waitFor();
+  await page.screenshot({ path: 'web/ui-arquivos.png', fullPage: true });
   holdTree = true;
   socket.send(JSON.stringify({ type: 'fs-change', path: 'exemplo.ts', base: 'C:/projetos/exemplo' }));
   await page.waitForRequest('**/api/tree?**');
@@ -164,9 +255,26 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
   await page.getByRole('button', { name: 'Abrir projeto', exact: true }).waitFor();
-  assert.equal(await page.locator('.lateral').count(), 0);
+  assert.equal(await page.locator('.sidebar-paginas').count(), 0);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   await page.screenshot({ path: 'web/ui-mobile.png', fullPage: true });
+  // Mobile com agentes: o palco e o terminal e a lateral vira gaveta.
+  projects = [{ id: 'p1', nome: 'Meu projeto', root: 'C:/projetos/exemplo', git: true }];
+  missions = [{ id: 'm1', projectId: 'p1', nome: 'Interface do cockpit', objetivo: 'Refinar a experiência', branch: 'b', git: { dirty: 0, head: 'a' }, usage, panes: [], squad: null }];
+  panes = [1, 2, 3].map(n => ({ paneId: `pane${n}`, agent: 'maestro', label: 'Maestro', cor: '#b8a1ff', missionId: 'm1', status: 'idle', atividade: [], iniciadoEm: Date.now(), usage }));
+  await page.reload();
+  await page.locator('.pane:visible').first().waitFor();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  assert.equal(await page.locator('.sidebar').evaluate(el => el.getBoundingClientRect().right <= 1), true, 'a gaveta comeca fora da tela no mobile');
+  await page.screenshot({ path: 'web/ui-mobile-focus.png', fullPage: true });
+  await page.getByRole('button', { name: 'Abrir lateral', exact: true }).click();
+  await page.locator('.sidebar.aberta').waitFor();
+  await page.waitForFunction(() => (document.querySelector('.sidebar')?.getBoundingClientRect().left ?? -999) >= -1, null, { timeout: 4000 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.screenshot({ path: 'web/ui-mobile-lateral.png', fullPage: true });
+  await page.getByRole('button', { name: 'Maestro · 3', exact: true }).click();
+  await page.locator('[data-pane-id="pane3"]:visible').waitFor();
+  assert.equal(await page.locator('.sidebar.aberta').count(), 0, 'escolher um agente fecha a gaveta');
   assert.deepEqual(errors, []);
-  console.log('PASS: welcome, navigation, search, terminal layouts, modals, maestro selection, free-model bridge tab, malformed payload recovery, closing project with delayed tree response, disconnection, mobile; no page errors.');
+  console.log('PASS: welcome, navigation, mission sidebar (switching mission or agent keeps every session and its output), twelve agents with keyboard, search, terminal layouts, modals with focus return, maestro selection, free-model bridge tab, malformed payload recovery, closing project with delayed tree response, disconnection, mobile drawer; no page errors.');
 } finally { await browser.close(); server.close(); }

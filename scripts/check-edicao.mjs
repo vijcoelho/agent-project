@@ -59,7 +59,8 @@ const estado = await page.locator(".connection").getAttribute("class");
 ok(/connected/.test(estado ?? ""), `voltou a "conectado" (${estado})`);
 
 // --- edição pendente ---
-await page.getByRole("button", { name: "Arquivos e memória", exact: true }).click();
+// A árvore mora na página Arquivos da lateral, irmã da página Missões.
+await page.getByRole("tablist", { name: "Páginas da lateral" }).getByRole("tab", { name: "Arquivos", exact: true }).click();
 await page.waitForTimeout(600);
 await page.getByRole("button", { name: "a.ts", exact: true }).click();
 await page.locator(".editor-host").waitFor();

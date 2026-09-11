@@ -5,9 +5,12 @@ import type { No, Nota } from "./api.ts";
 /**
  * Arquivos e memória do projeto.
  *
- * Só aparece quando você pede. Os dois moram juntos porque são a mesma
- * pergunta — o que este projeto tem — em dois formatos: o que está em disco e
- * o que os agentes aprenderam.
+ * Os dois moram juntos porque são a mesma pergunta — o que este projeto tem —
+ * em dois formatos: o que está em disco e o que os agentes aprenderam.
+ *
+ * Isto é uma página da lateral, irmã de Missões: não abre painel novo ao lado
+ * do terminal. Quem escolhe a página é a lateral; aqui dentro só se escolhe
+ * entre a árvore e a memória.
  */
 
 function Node({
@@ -66,7 +69,6 @@ export function Arquivos({
   tocado,
   onOpenFile,
   onEsquecer,
-  onFechar,
 }: {
   tree: No[];
   memoria: Nota[];
@@ -74,7 +76,6 @@ export function Arquivos({
   tocado: Set<string>;
   onOpenFile: (caminho: string) => void;
   onEsquecer: (quando: number) => void;
-  onFechar: () => void;
 }) {
   const [aberto, setAberto] = useState<Set<string>>(new Set());
   const [aba, setAba] = useState<"arquivos" | "memoria">("arquivos");
@@ -88,7 +89,7 @@ export function Arquivos({
     });
 
   return (
-    <aside className="lateral">
+    <div className="arquivos-pagina">
       <nav className="abas" role="tablist" aria-label="Arquivos e memória">
         <button
           role="tab"
@@ -106,10 +107,6 @@ export function Arquivos({
         >
           Memória
           {memoria.length > 0 && <span className="count">{memoria.length}</span>}
-        </button>
-        <span className="spacer" />
-        <button className="icon-btn" onClick={onFechar} aria-label="Fechar arquivos" title="Fechar">
-          ✕
         </button>
       </nav>
 
@@ -148,6 +145,6 @@ export function Arquivos({
           ))
         )}
       </div>
-    </aside>
+    </div>
   );
 }

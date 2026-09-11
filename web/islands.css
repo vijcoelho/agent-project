@@ -1,0 +1,187 @@
+/* Cockpit: lateral de missões + palco de terminais. O resto herda style.css. */
+[hidden] { display: none !important; }
+::selection { background: #ffffff30; color: var(--ink); }
+input, textarea { caret-color: var(--ink); }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+button, summary { -webkit-tap-highlight-color: transparent; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.btn.solid:hover:not(:disabled) { background: #d9d9d9; filter: none; box-shadow: none; }
+.campo { padding: 9px 12px; }
+.campo:focus-visible, .picker:focus-visible { outline: 2px solid var(--ink); }
+
+/* ---------- shell ---------- */
+.cockpit { padding: 0; }
+.shell { display: flex; flex: 1; min-height: 0; min-width: 0; position: relative; }
+
+/* ---------- lateral ---------- */
+.sidebar { display: flex; flex-direction: column; width: 272px; flex: none; min-height: 0; background: var(--preto); }
+.sidebar-top { display: flex; align-items: center; gap: 4px; min-height: 56px; padding: 8px 8px 8px 14px; flex: none; }
+.brand-button { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; padding: 6px 0; border: 0; background: none; color: var(--ink); cursor: pointer; text-align: left; }
+.brand-mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: var(--barra); border: 1px solid var(--fio); flex: none; }
+.project-name { flex: 1; min-width: 0; font-size: 13px; font-weight: 550; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brand-button > svg { color: var(--ink-3); flex: none; }
+.fechar-lateral { display: none; }
+
+.sidebar-scroll { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 0 10px 10px; }
+.sidebar-island { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; border: 1px solid var(--fio); border-radius: 18px; background: var(--carta); }
+.island-corpo { flex: 1; min-height: 0; overflow: auto; padding: 6px 8px 10px; }
+/* Duas páginas, um controle só. A ilha embaixo é a mesma nas duas. */
+.sidebar-paginas { display: flex; gap: 3px; margin: 0 10px 8px; padding: 3px; border-radius: 11px; background: var(--carta); flex: none; }
+.sidebar-paginas button { flex: 1; min-height: 30px; border: 0; border-radius: 8px; background: none; color: var(--ink-3); font-size: 12.5px; font-family: inherit; cursor: pointer; }
+.sidebar-paginas button:hover { color: var(--ink); }
+.sidebar-paginas button.on { background: var(--barra); color: var(--ink); font-weight: 550; }
+.arquivos-pagina { display: flex; flex-direction: column; min-height: 0; }
+.arquivos-pagina .abas { min-height: 0; padding: 2px 2px 6px; gap: 2px; border-bottom: 1px solid var(--fio); }
+.arquivos-pagina .aba { padding: 8px 10px; font-size: 12px; }
+.arquivos-pagina .lateral-corpo { padding: 6px 0 0; overflow: visible; }
+.arquivos-pagina .fnode { border-radius: 7px; min-height: 27px; font-size: 12.5px; }
+.arquivos-pagina .nota { border-radius: 9px; }
+.arquivos-pagina .vazio-nota { padding: 14px 8px; font-size: 12px; line-height: 1.5; }
+.sidebar-secao { display: flex; align-items: center; gap: 8px; padding: 10px 6px 6px; }
+.sidebar-titulo { flex: 1; font-size: 11px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-3); }
+.sidebar-vazio { margin: 4px 6px; color: var(--ink-3); font-size: 12px; line-height: 1.5; }
+
+.mission-node { margin-bottom: 1px; }
+.mission-row { display: flex; align-items: center; border-radius: 8px; color: var(--ink-2); }
+.mission-row:hover { background: var(--carta); color: var(--ink); }
+.mission-row.ativa { background: var(--barra); color: var(--ink); }
+.caret-btn { display: grid; place-items: center; width: 22px; height: 30px; flex: none; border: 0; background: none; color: var(--ink-3); cursor: pointer; }
+.caret-btn svg { transform: rotate(-90deg); transition: transform 140ms ease; }
+.caret-btn[aria-expanded="true"] svg { transform: rotate(0deg); }
+.mission-name { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; height: 30px; padding: 0 8px 0 0; border: 0; background: none; color: inherit; font-size: 13px; cursor: pointer; text-align: left; }
+.mission-name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mission-row.ativa .mission-name { font-weight: 600; }
+.mission-count { flex: none; font-style: normal; font-size: 10px; font-family: var(--fonte-mono); color: var(--ink-3); background: var(--carta); border-radius: 5px; padding: 1px 5px; }
+.mission-row.ativa .mission-count { background: var(--preto); }
+
+.mission-agents { display: flex; flex-direction: column; padding: 1px 0 4px 22px; }
+.agent-row { display: flex; align-items: center; gap: 8px; min-height: 28px; padding: 0 8px; border: 0; border-radius: 7px; background: none; color: var(--ink-3); font-size: 12.5px; cursor: pointer; text-align: left; }
+.agent-row > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-row:hover:not(:disabled) { background: var(--carta); color: var(--ink); }
+.agent-row.selecionado { background: color-mix(in srgb, var(--identity, #b8a1ff) 16%, var(--barra)); color: var(--ink); box-shadow: inset 2px 0 0 var(--identity, #b8a1ff); }
+.agent-row.novo:disabled { opacity: .45; cursor: not-allowed; }
+
+.sidebar-foot { display: flex; flex-direction: column; gap: 2px; padding: 8px; flex: none; border-top: 1px solid var(--fio); }
+.sidebar-foot .btn { justify-content: flex-start; border: 0; background: none; min-height: 34px; font-size: 12.5px; }
+.sidebar-foot .btn:hover:not(:disabled) { background: var(--carta); }
+.sidebar-foot .btn.on { background: var(--barra); color: var(--ink); }
+.sidebar-foot .redline { display: flex; flex-wrap: wrap; gap: 4px; height: auto; border: 0; padding: 4px 0; }
+.sidebar-linha { display: flex; align-items: center; gap: 6px; padding: 6px 4px 2px; }
+.sidebar-linha .connection { font-size: 11px; }
+.sidebar-veu { display: none; }
+
+
+/* ---------- mascotes ---------- */
+/* Corpo respira devagar; os olhos piscam de vez em quando. Encerrado e sem
+   conexao nao animam: parado tem que parecer parado. */
+.mascote { flex: none; overflow: visible; }
+.mascote-corpo { transform-box: fill-box; transform-origin: 50% 92%; animation: mascote-bob 4.2s ease-in-out infinite; }
+.mascote.e-run .mascote-corpo { animation-duration: 2.4s; }
+.mascote.e-dead .mascote-corpo, .mascote.e-off .mascote-corpo { animation: none; }
+.mascote.e-dead, .mascote.e-off { opacity: .55; }
+.mascote-olho { transform-box: fill-box; transform-origin: center; animation: mascote-pisca 5.6s ease-in-out infinite; }
+.mascote.e-run .mascote-olho { animation-duration: 3.8s; }
+@keyframes mascote-bob { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-5%) scale(1.03, .97); } }
+@keyframes mascote-pisca { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.12); } }
+.agent-row .mascote { margin-right: 1px; }
+.mascote-canto { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 13px; background: var(--carta); border: 1px solid var(--fio); }
+/* Catálogo: cada agente é um bicho diferente, e sorri quando você chega. */
+.mascote .boca-sorriso { opacity: 0; }
+.agent-choice:hover .boca-reta, .agent-choice.selected .boca-reta { opacity: 0; }
+.agent-choice:hover .boca-sorriso, .agent-choice.selected .boca-sorriso { opacity: 1; }
+.agent-choice:hover .mascote-corpo, .agent-choice.selected .mascote-corpo { animation-duration: 1.6s; }
+.agent-choice .mascote { margin: 0 2px; }
+/* ---------- palco ---------- */
+.stage { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; padding: 10px 12px 12px; position: relative; }
+.abrir-lateral { display: none; position: absolute; top: 14px; left: 14px; z-index: 6; background: var(--barra); border: 1px solid var(--fio); border-radius: 11px; }
+.cols { border-radius: 9px; padding: 3px; gap: 3px; background: var(--carta); }
+.cols button { min-width: 30px; height: 30px; border-radius: 6px !important; font-family: var(--fonte-ui); font-size: 12px; padding: 0 8px; }
+.work { gap: 12px; position: relative; }
+.panes-wrap { flex-direction: column; }
+
+/* ---------- terminal ---------- */
+/* A cor do agente contorna o terminal inteiro, não só uma aresta: com seis
+   painéis abertos é ela que diz de quem é cada um, de relance. O escolhido
+   ganha a cor cheia e um anel por fora. */
+.pane { position: relative; border: 1px solid color-mix(in srgb, var(--pane, #b8a1ff) 45%, var(--fio)); }
+.pane.selecionado { border-color: var(--pane, #b8a1ff); box-shadow: 0 0 0 2px color-mix(in srgb, var(--pane, #b8a1ff) 30%, transparent); }
+.pane-head { border-bottom: 1px solid color-mix(in srgb, var(--pane, #b8a1ff) 18%, var(--fio)); }
+.pane-head { min-height: 48px; padding: 6px 14px; gap: 10px; }
+.pane-state { font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+.pane-term { padding: 12px 6px 4px 14px; }
+.pane-details { flex: none; }
+.pane-details summary { display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--ink-2); font-size: 12px; padding: 8px 4px; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+.pane-details-content { position: absolute; top: 48px; right: 12px; z-index: 4; display: flex; flex-direction: column; align-items: flex-start; gap: 14px; width: min(270px, calc(100% - 24px)); padding: 20px; border: 1px solid var(--fio-forte); border-radius: 14px; background: var(--barra); box-shadow: 0 12px 28px #0006; }
+.pane-details-content .model { white-space: normal; overflow-wrap: anywhere; }
+
+/* ---------- superfícies auxiliares ---------- */
+.editor { border: 1px solid var(--fio); border-radius: 18px; overflow: hidden; }
+.editor-head { min-height: 50px; }
+.panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.panel-heading h2 { font-size: 22px; font-weight: 600; letter-spacing: -0.025em; margin: 0; overflow-wrap: anywhere; }
+.panel-heading p { color: var(--ink-3); margin: 8px 0 0; }
+.mission-details, .agent-picker-panel, .activity-panel { display: flex; flex-direction: column; gap: 24px; padding: 28px; max-height: calc(100dvh - 64px); overflow: auto; }
+.mission-objective { margin: 0; line-height: 1.65; color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.detail-list { margin: 0; }
+.detail-list > div { display: flex; align-items: baseline; gap: 20px; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--fio); }
+.detail-list dt { color: var(--ink-3); }
+.detail-list dd { text-align: right; margin: 0; overflow-wrap: anywhere; min-width: 0; }
+.mission-details > .btn, .activity-panel > .btn { align-self: flex-start; }
+.mission-details .brief { flex-wrap: wrap; border: 0; border-radius: 14px; padding: 16px; }
+.mission-details .brief-input { flex-basis: 100%; }
+.mission-details .phases { flex-wrap: wrap; gap: 4px; }
+.agent-avatar { display: grid; place-items: center; width: 42px; height: 42px; flex: none; border-radius: 13px; background: color-mix(in srgb, var(--identity, #b8a1ff) 18%, #141414); color: color-mix(in srgb, var(--identity, #b8a1ff) 70%, white); border: 1px solid color-mix(in srgb, var(--identity, #b8a1ff) 24%, transparent); }
+.agent-catalog { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.agent-choice { display: flex; align-items: center; gap: 14px; padding: 14px; border: 1px solid var(--fio); border-radius: 16px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.agent-choice:hover { background: var(--barra); }
+.agent-choice.selected { border-color: var(--ink-3); background: var(--barra); }
+.agent-choice > span:last-child { min-width: 0; }
+.agent-choice b { font-weight: 600; overflow-wrap: anywhere; }
+.agent-choice small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--ink-3); font-size: 12px; margin-top: 3px; }
+.advanced-options { border-top: 1px solid var(--fio); padding-top: 16px; }
+.advanced-options summary { color: var(--ink-2); cursor: pointer; padding: 8px 0; }
+.advanced-options[open] summary { margin-bottom: 14px; }
+.panel-actions { display: flex; justify-content: flex-end; gap: 12px; }
+.activity-panel .redline { display: flex; flex-wrap: wrap; height: auto; border: 0; }
+.activity-panel .cota { height: auto; padding: 8px; }
+.abas { padding-top: 8px; }
+.aba { padding: 12px 16px; white-space: nowrap; }
+.wizard-topo, .consumo-head { padding: 20px 24px; }
+.wizard-corpo, .consumo-corpo { padding: 24px; gap: 24px; }
+.wizard-pe { padding: 16px 24px; }
+.modal-window:has(.mission-details), .modal-window:has(.activity-panel) { width: min(640px, calc(100vw - 32px)); }
+.modal-window[open] { animation: island-reveal 200ms cubic-bezier(.16, 1, .3, 1); }
+@keyframes island-reveal { from { opacity: .4; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (max-width: 1100px) {
+  .sidebar { width: 226px; }
+  .pane-state { display: none; }
+}
+
+@media (max-width: 760px) {
+  /* A lateral vira gaveta: o palco continua ocupando a tela inteira. */
+  .sidebar { position: absolute; inset: 0 auto 0 0; z-index: 14; width: min(84vw, 300px); transform: translateX(-102%); transition: transform 200ms ease; box-shadow: 0 0 40px #000c; }
+  .sidebar.aberta { transform: translateX(0); }
+  .fechar-lateral { display: grid; }
+  .sidebar-veu { display: block; position: absolute; inset: 0; z-index: 13; border: 0; background: #000000a8; }
+  .abrir-lateral { display: grid; }
+  .stage { padding: 8px; }
+      .work.dividido .panes-wrap { display: none; }
+  .work.dividido .editor { flex: 1; }
+  .modal-window, .modal-window:has(> .ajustes) { width: calc(100vw - 16px); border-radius: 18px; }
+  .mission-details, .agent-picker-panel, .activity-panel { padding: 20px; max-height: calc(100dvh - 48px); }
+  .agent-catalog { grid-template-columns: 1fr; }
+  .wizard-corpo, .consumo-corpo { padding: 18px; }
+  .partida { padding: 24px 12px; }
+  .partida h2 { font-size: 24px; }
+  .icon-btn { min-width: 40px; min-height: 40px; }
+  .nota .icon-btn, .linha .apagar, .skill .apagar, .receita .apagar { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-window[open] { animation: none; }
+  .sidebar { transition: none; }
+  .caret-btn svg { transition: none; }
+  .mascote-corpo, .mascote-olho { animation: none; }
+}

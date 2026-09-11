@@ -3,6 +3,8 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { onOutput, send } from "./socket.ts";
 import type { AgentSpec, PaneState, Usage } from "./api.ts";
+import { Icon } from "./Icon.tsx";
+import { Mascote } from "./Mascote.tsx";
 
 const BARRAS = 40;
 
@@ -44,30 +46,40 @@ export function Pane({
   spec,
   usage,
   onClose,
+  visible = true,
+  label,
+  selecionado = false,
 }: {
   pane: PaneState;
   spec: AgentSpec | undefined;
   usage: Usage | undefined;
   onClose: () => void;
+  visible?: boolean;
+  label?: string;
+  selecionado?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
+  const terminal = useRef<Terminal | null>(null);
+  const fitter = useRef<FitAddon | null>(null);
 
   useEffect(() => {
     const term = new Terminal({
       fontFamily: '"Cascadia Mono", "Cascadia Code", Consolas, monospace',
-      fontSize: 12,
-      lineHeight: 1.25,
+      fontSize: 13,
+      lineHeight: 1.35,
       cursorBlink: true,
       scrollback: 5000,
       allowProposedApi: true,
       theme: {
-        background: "#060708",
-        foreground: "#c9d3de",
+        background: "#141414",
+        foreground: "#e5e5e5",
         cursor: pane.cor,
-        selectionBackground: "#00b4ff33",
+        selectionBackground: "#ffffff30",
       },
     });
     const fit = new FitAddon();
+    terminal.current = term;
+    fitter.current = fit;
     term.loadAddon(fit);
     // O elemento é guardado numa constante: durante a desmontagem o React
     // zera a ref, e o ResizeObserver ainda podia disparar uma vez depois
@@ -85,33 +97,56 @@ export function Pane({
     const observer = new ResizeObserver(() => {
       // Fora da árvore a altura é zero, e caber num espaço que não existe
       // deixa o xterm com dimensões inválidas na próxima montagem.
-      if (area.clientHeight > 0) fit.fit();
+      if (area.clientHeight > 0 && area.clientWidth > 0) fit.fit();
     });
     observer.observe(area);
-    fit.fit();
+    if (area.clientHeight > 0 && area.clientWidth > 0) fit.fit();
 
     return () => {
       observer.disconnect();
       offOutput();
       term.dispose();
+      terminal.current = null;
+      fitter.current = null;
     };
-  }, [pane.paneId, pane.cor]);
+  }, [pane.paneId]);
+
+  useEffect(() => {
+    if (terminal.current) terminal.current.options.theme = {
+      background: "#141414", foreground: "#e5e5e5", cursor: pane.cor, selectionBackground: "#ffffff30",
+    };
+  }, [pane.cor]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const frame = requestAnimationFrame(() => {
+      if (host.current && host.current.clientWidth > 0 && host.current.clientHeight > 0) {
+        fitter.current?.fit();
+        if (selecionado) terminal.current?.focus();
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [visible, selecionado]);
 
   const parado = pane.status === "idle";
 
   return (
-    <section className="pane" style={{ ["--pane" as string]: pane.cor }}>
+    <section className={`pane${selecionado ? " selecionado" : ""}`} hidden={!visible} data-pane-id={pane.paneId} aria-label={`Terminal de ${label ?? spec?.label ?? pane.label}`} style={{ ["--pane" as string]: pane.cor }}>
       {/* Uma linha só. O que é detalhe vive no title; o cabeçalho carrega o
           que se lê de relance com doze painéis abertos: quem, com quê,
           fazendo algo ou não, e quanto custou. */}
       <header className="pane-head">
-        <span
-          className={`luz${parado ? " parada" : ""}`}
-          title={parado ? "à sua espera" : "trabalhando"}
-        />
+        {/* O mascote diz o que a luz dizia — trabalhando ou parado — com a
+            identidade do agente junto. */}
+        <Mascote semente={pane.agent} cor={pane.cor} estado={pane.status} tamanho={24} />
         <span className="who" title={`${spec?.label ?? pane.label} · ${pane.cli}`}>
-          {spec?.label ?? pane.label}
+          {label ?? spec?.label ?? pane.label}
         </span>
+        <span className="pane-state">{pane.status === "dead" ? "Encerrado" : parado ? "Sem atividade recente" : "Em atividade"}</span>
+        <span className="spacer" />
+        <details className="pane-details">
+          <summary>Detalhes <Icon name="chevron" size={14} /></summary>
+          <div className="pane-details-content">
         {(pane.model ?? spec?.model) && (
           <span className="model" title={pane.tipo ? `tarefa: ${pane.tipo}` : "modelo do catálogo"}>
             {pane.model ?? spec?.model}
@@ -119,7 +154,6 @@ export function Pane({
           </span>
         )}
         <Spark atividade={pane.atividade} />
-        <span className="spacer" />
         {usage && usage.turnos > 0 ? (
           <span className="meter" title={`${compacto(usage.in + usage.cacheWrite + usage.cacheRead)} entrada · ${compacto(usage.out)} saída · ${usage.turnos} turnos em ${usage.model ?? "—"}`}>
             ${usage.custo.toFixed(2)}
@@ -129,9 +163,10 @@ export function Pane({
             {desdeQuando(Date.now() - pane.iniciadoEm)}
           </span>
         )}
-        <button className="icon-btn fechar" onClick={onClose} title="fechar painel">
-          ✕
-        </button>
+        <span className="dica">{pane.cli} · {pane.tipo || "Tarefa padrão"}</span>
+        <button className="btn perigo" onClick={onClose}>Encerrar agente</button>
+          </div>
+        </details>
       </header>
       <div className="pane-term" ref={host} />
     </section>

@@ -1,11 +1,13 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { type CSSProperties, lazy, Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { getConnection, onMessage, onReconnect, send, subscribeConnection } from "./socket.ts";
 import { Icon } from "./Icon.tsx";
 import { Modal } from "./Modal.tsx";
 import { Maestro } from "./Maestro.tsx";
 import { Workspace } from "./Workspace.tsx";
 import { Arquivos } from "./Arquivos.tsx";
-import { PaneGrid } from "./PaneGrid.tsx";
+import { PaneGrid, type Colunas } from "./PaneGrid.tsx";
+import { Lateral, type Pagina } from "./Lateral.tsx";
+import { Mascote } from "./Mascote.tsx";
 import { SquadBar } from "./SquadBar.tsx";
 import { gravar, type EstadoVoz, type Gravacao } from "./voz.ts";
 import { Microfone } from "./Microfone.tsx";
@@ -50,8 +52,17 @@ const Editor = lazy(() => import("./Editor.tsx").then((module) => ({ default: mo
 export function App() {
   const connection = useSyncExternalStore(subscribeConnection, getConnection);
   const [verWorkspace, setVerWorkspace] = useState(false);
-  const [verArquivos, setVerArquivos] = useState(false);
-  const [colunas, setColunas] = useState<"auto" | "1" | "2" | "3">("auto");
+  const [verMissao, setVerMissao] = useState(false);
+  const [verAgentes, setVerAgentes] = useState(false);
+  const [verAtividade, setVerAtividade] = useState(false);
+  const [lateralAberta, setLateralAberta] = useState(false);
+  const [selectedPane, setSelectedPane] = useState<string | null>(null);
+  const [paginaLateral, setPaginaLateral] = useState<Pagina>("missoes");
+  // Quantas colunas de terminal. Fica nos Ajustes: a tela principal e terminal.
+  const [colunas, setColunas] = useState<Colunas>(() => {
+    const salvo = localStorage.getItem("cockpit.colunas");
+    return salvo === "1" || salvo === "2" || salvo === "3" ? salvo : "auto";
+  });
   const [agents, setAgents] = useState<Record<string, AgentSpec>>({});
   const [squads, setSquads] = useState<Record<string, SquadSpec>>({});
   const [tarefas, setTarefas] = useState<Record<string, TipoTarefa>>({});
@@ -239,6 +250,12 @@ export function App() {
     else setMemoria([]);
   }, [projectId, recarregarMissoes]);
 
+  useEffect(() => {
+    setSelectedPane(null);
+    setVerMissao(false);
+    setVerAgentes(false);
+  }, [activeId, projectId]);
+
   // Trocar de missão troca a raiz dos arquivos e fecha o editor.
   useEffect(() => {
     setArquivo(null);
@@ -325,197 +342,119 @@ export function App() {
 
   const ditarNoPainel = () =>
     ditar("painel", (texto) => {
-      const alvo = visible[0];
+      const alvo = visible.find(p => p.paneId === selectedPane) ?? visible[0];
       if (alvo) send({ type: "input", paneId: alvo.paneId, data: texto });
       else setAviso("abra um painel antes de ditar");
     });
 
+  // A missão pode ter agentes antes de você escolher um: o primeiro da lista
+  // serve de padrão para a tela principal nunca ficar vazia sem motivo.
+  const selecionado = visible.find((p) => p.paneId === selectedPane)?.paneId ?? visible[0]?.paneId ?? null;
+
+  const abrirPainel = (missionId: string, paneId: string) =>
+    trocar(() => {
+      setActiveId(missionId);
+      setSelectedPane(paneId);
+      setLateralAberta(false);
+    });
+
+  /** A página de arquivos mora dentro da lateral, irmã da página de missões. */
+  const paginaArquivos = project ? (
+    <Arquivos
+      tree={tree}
+      memoria={memoria}
+      arquivoAberto={arquivo}
+      tocado={tocado}
+      onOpenFile={(caminho) =>
+        trocar(() =>
+          guarded(async () => {
+            const f = await fetchFile(activeId, projectId, caminho);
+            if (activeIdRef.current !== activeId || projectIdRef.current !== projectId) return;
+            setArquivo(caminho);
+            setConteudo(f.content);
+            setSujo(false);
+            // No celular a lateral é gaveta: abrir o arquivo revela o editor.
+            setLateralAberta(false);
+            setTocado((prev) => {
+              const proximo = new Set(prev);
+              proximo.delete(caminho);
+              return proximo;
+            });
+          }),
+        )
+      }
+      onEsquecer={(quando) =>
+        guarded(async () => {
+          if (!projectId) return;
+          await deleteNota(projectId, quando);
+          setMemoria(await fetchMemoria(projectId));
+        })
+      }
+    />
+  ) : null;
+
+  /** Ferramentas do rodapé da lateral: fora da tela principal, perto do resto. */
+  const ferramentas = (
+    <>
+      {active && <button className="btn quiet" aria-label="Detalhes da missão" onClick={() => setVerMissao(true)}><Icon name="memory" size={16} /> Missão</button>}
+      <button className="btn quiet" aria-label="Consumo" onClick={() => setVerAtividade(true)}><Icon name="chart" size={16} /> Atividade</button>
+      <button className="btn quiet" aria-label="Configurações" onClick={() => setVerConfig(true)}><Icon name="settings" size={16} /> Ajustes</button>
+      {/* Cota só aparece apertada ou bloqueada: alerta real não se esconde
+          para a tela ficar limpa, e cota tranquila não vira enfeite. */}
+      <Redline compact />
+      <div className="sidebar-linha">
+        <span className={`connection ${connection}`} role="status" aria-label={connection === "connected" ? "Conectado ao servidor" : "Sem conexão"}>
+          <i />{connection !== "connected" && (connection === "connecting" ? "Conectando…" : "Sem conexão")}
+        </span>
+        <span className="spacer" />
+        {active && <><button className={`btn idioma${traduzir ? " on" : ""}`} aria-label="Traduzir ditado para inglês" aria-pressed={traduzir} onClick={() => { setTraduzir(!traduzir); localStorage.setItem("cockpit.traduzir", !traduzir ? "1" : "0"); }}>{traduzir ? "PT→EN" : "PT"}</button>
+        <Microfone estado={voz} ativo={vozOnde === "painel"} onClick={ditarNoPainel} /></>}
+      </div>
+    </>
+  );
+
   return (
     <div className="cockpit">
       {connection === "disconnected" && <div className="aviso" role="alert">A conexão com o servidor foi interrompida. Reinicie o servidor e recarregue para continuar.<button onClick={() => window.location.reload()}>Recarregar</button></div>}
-      <div className="deck">
-        <div className="bench">
-          {/* Uma barra só. Tudo o que não é terminal cabe aqui — cada linha a
-              mais aqui em cima é uma linha a menos de terminal. */}
-          <div className="headline">
-            <button
-              className="btn projeto"
-              onClick={() => setVerWorkspace(true)}
-              title="Projetos e missões"
-            >
-              <Icon name="grid" size={14} />
-              {project ? project.nome : "Projetos"}
-            </button>
-            {active ? (
-              <>
-                <span className="fio-v" />
-                <h1>{active.nome}</h1>
-                {active.elenco && active.elenco.clis.length > 0 && (
-                  <span
-                    className="branch elenco-selo"
-                    title="IAs liberadas nesta missão. O cockpit não abre painel fora desta lista; quem está marcado como só imagens não escreve nem desenha a tela."
-                  >
-                    {active.elenco.clis
-                      .map((c) => {
-                        const nome = { claude: "Claude", codex: "GPT", agy: "Gemini", bash: "Terminal" }[c] ?? c;
-                        return active.elenco?.soVisual?.includes(c) ? `${nome} (só imagens)` : nome;
-                      })
-                      .join(" · ")}
-                  </span>
-                )}
-                {active.branch ? (
-                  <span className="branch">{active.branch}</span>
-                ) : (
-                  <button
-                    className="branch avulsa"
-                    title="As missões deste projeto dividem a mesma pasta. Clique para iniciar um git aqui — cada missão nova passa a ganhar um worktree próprio."
-                    onClick={() =>
-                      guarded(async () => {
-                        if (!projectId) return;
-                        await prepararGit(projectId);
-                        await recarregarProjetos();
-                        await recarregarMissoes(projectId);
-                      })
-                    }
-                    disabled={busy}
-                  >
-                    sem isolamento · isolar
-                  </button>
-                )}
-                {active.objetivo && (
-                  <span className="objetivo" title={active.objetivo}>
-                    {active.objetivo}
-                  </span>
-                )}
-                <span className="spacer" />
-                <select
-                  className="picker"
-                  aria-label="Agente do novo painel"
-                  value={agent}
-                  onChange={(e) => setAgent(e.target.value)}
-                  title={agents[agent]?.papel ?? ""}
-                >
-                  {Object.entries(agents).map(([id, a]) => (
-                    <option key={id} value={id}>
-                      {a.label} — {a.model ?? a.cli}
-                      {a.effort ? ` · ${a.effort}` : ""}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className="picker"
-                  aria-label="Tipo de tarefa"
-                  value={tipoManual}
-                  onChange={(e) => setTipoManual(e.target.value)}
-                  title="O tipo do trabalho decide modelo e esforço. Sem tipo, vale o padrão do agente."
-                >
-                  <option value="">sem tipo</option>
-                  {Object.entries(tarefas).map(([id, t]) => (
-                    <option key={id} value={id}>
-                      {t.label}
-                      {t.model ? ` · ${t.model}` : ""}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  className="btn solid"
-                  disabled={connection !== "connected"}
-                  style={
-                    agents[agent]
-                      ? ({ ["--pane" as string]: agents[agent]!.cor } as object)
-                      : undefined
-                  }
-                  onClick={() =>
-                    send({
-                      type: "spawn",
-                      agent,
-                      missionId: active.id,
-                      tipo: tipoManual || undefined,
-                    })
-                  }
-                >
-                  Abrir painel
-                </button>
-              </>
-            ) : (
-              <span className="spacer" />
-            )}
-
-            {/* Colunas: só aparece quando há mais de um terminal para arrumar. */}
-            {active && visible.length > 1 && (
-              <span className="cols" role="group" aria-label="Colunas dos terminais">
-                {(["auto", "1", "2", "3"] as const).map((c) => (
-                  <button
-                    key={c}
-                    className={colunas === c ? "on" : undefined}
-                    title={c === "auto" ? "Colunas automáticas" : `${c} coluna${c === "1" ? "" : "s"}`}
-                    onClick={() => setColunas(c)}
-                  >
-                    {c === "auto" ? "A" : c}
-                  </button>
-                ))}
-              </span>
-            )}
-
-            <span className="sep" />
-            {/* Ditado e estado da conexão: as duas coisas que dizem se o
-                cockpit está te ouvindo. Ficam juntas, no canto. */}
-            {active && (
-              <>
-                <button
-                  className={`btn idioma${traduzir ? " on" : ""}`}
-                  onClick={() => {
-                    const proximo = !traduzir;
-                    setTraduzir(proximo);
-                    localStorage.setItem("cockpit.traduzir", proximo ? "1" : "0");
-                  }}
-                  title={
-                    traduzir
-                      ? "Você fala português, o agente recebe em inglês."
-                      : "O agente recebe exatamente o que você falar."
-                  }
-                >
-                  {traduzir ? "PT→EN" : "PT"}
-                </button>
-                <Microfone estado={voz} ativo={vozOnde === "painel"} onClick={ditarNoPainel} />
-              </>
-            )}
-            <span
-              className={`connection ${connection}`}
-              role="status"
-              title={connection === "connected" ? "Conectado ao servidor" : connection === "connecting" ? "Conectando…" : "Sem conexão"}
-            >
-              <i />
-              {connection !== "connected" && (connection === "connecting" ? "conectando" : "sem conexão")}
-            </span>
-            {project && (
-              <button
-                className={`icon-btn${verArquivos ? " on" : ""}`}
-                aria-label="Arquivos e memória"
-                aria-pressed={verArquivos}
-                onClick={() => setVerArquivos((v) => !v)}
-                title="Arquivos e memória"
-              >
-                <Icon name="folder" size={15} />
-              </button>
-            )}
-            <button className="icon-btn" aria-label="Consumo" onClick={() => setVerConsumo(true)} title={`Consumo — $${custoTotal.toFixed(2)} estimados`}>
-              <Icon name="chart" size={15} />
-            </button>
-            <button
-              className="icon-btn"
-              aria-label="Maestro"
-              onClick={() => setVerMaestro(true)}
-              title={`Maestro: ${maestroCli === "codex" ? "GPT" : (maestroCli ?? "escolher")}`}
-            >
-              <Icon name="team" size={15} />
-            </button>
-            <button className="icon-btn" aria-label="Configurações" onClick={() => setVerConfig(true)} title="Configurações">
-              <Icon name="settings" size={15} />
-            </button>
-          </div>
-
-          {active && (
+      <div className="shell">
+        <Lateral
+          project={project ?? undefined}
+          missions={missions}
+          activeId={activeId}
+          panes={panes}
+          agents={agents}
+          selectedId={selecionado}
+          connected={connection === "connected"}
+          onProjetos={() => setVerWorkspace(true)}
+          onSelectMission={(id) => trocar(() => { setActiveId(id); setLateralAberta(false); })}
+          onSelectPane={abrirPainel}
+          onNovaMissao={() => setCriandoMissao(true)}
+          onAddAgente={(id) => trocar(() => { setActiveId(id); setVerAgentes(true); })}
+          aberta={lateralAberta}
+          onFechar={() => setLateralAberta(false)}
+          pagina={paginaLateral}
+          onPagina={setPaginaLateral}
+          arquivos={paginaArquivos}
+          rodape={ferramentas}
+        />
+        {lateralAberta && <button className="sidebar-veu" aria-label="Fechar lateral" onClick={() => setLateralAberta(false)} />}
+        <main className="stage">
+          {/* No celular a lateral é gaveta e precisa de uma porta. No desktop
+              ela está sempre aberta, e este botão não existe. */}
+          <button className="icon-btn abrir-lateral" aria-label="Abrir lateral" onClick={() => setLateralAberta(true)}><Icon name="grid" size={17} /></button>
+          {verMissao && active && <Modal title="Detalhes da missão" onClose={() => setVerMissao(false)}>
+            <section className="mission-details">
+              <header className="panel-heading"><h2>{active.nome}</h2><button className="icon-btn" aria-label="Fechar detalhes da missão" onClick={() => setVerMissao(false)}><Icon name="close" /></button></header>
+              <p className="mission-objective">{active.objetivo || "Esta missão ainda não tem um objetivo definido."}</p>
+              <dl className="detail-list">
+                <div><dt>Projeto</dt><dd>{project?.nome}</dd></div>
+                <div><dt>Branch</dt><dd>{active.branch || "Pasta compartilhada"}</dd></div>
+                <div><dt>Arquivos alterados</dt><dd>{active.git.dirty}</dd></div>
+                <div><dt>Elenco</dt><dd>{active.elenco?.clis.map(cli => `${cli}${active.elenco?.soVisual?.includes(cli) ? " (só imagens)" : ""}`).join(" · ") || "Catálogo de agentes"}</dd></div>
+              </dl>
+              {!active.branch && <button className="btn" disabled={busy} onClick={() => guarded(async () => { if (!projectId) return; await prepararGit(projectId); await recarregarProjetos(); await recarregarMissoes(projectId); })}>Preparar isolamento com Git</button>}
+              <button className="btn" aria-label="Maestro" onClick={() => { setVerMissao(false); setVerMaestro(true); }}><Icon name="team" size={16} /> Maestro e continuidade · {maestroCli ?? "Escolher"}</button>
+          {active && verMissao && (
             <SquadBar
               mission={active}
               squads={squads}
@@ -537,6 +476,43 @@ export function App() {
               }
             />
           )}
+
+            </section>
+          </Modal>}
+
+          {verAgentes && active && <Modal title="Adicionar agente" onClose={() => setVerAgentes(false)}>
+            <section className="agent-picker-panel">
+              <header className="panel-heading"><div><h2>Quem entra na missão?</h2><p>Escolha um agente para trabalhar com você.</p></div><button className="icon-btn" aria-label="Fechar seleção de agente" onClick={() => setVerAgentes(false)}><Icon name="close" /></button></header>
+              <div className="agent-catalog">
+                {Object.entries(agents).map(([id, a]) => <button className={`agent-choice${agent === id ? " selected" : ""}`} aria-pressed={agent === id} key={id} onClick={() => setAgent(id)} style={{ "--identity": a.cor } as CSSProperties}>
+                  {/* O mesmo bicho que você vai ver na lateral e no terminal:
+                      forma pelo id, cor da identidade dele. */}
+                  <Mascote semente={id} cor={a.cor} estado="neutro" tamanho={42} />
+                  <span><b>{a.label}</b><small>{a.papel || a.cli}</small></span>
+                </button>)}
+              </div>
+              <details className="advanced-options"><summary>Tipo de tarefa e modelo</summary>
+                <label className="campo-bloco">Tipo de tarefa<select className="campo" aria-label="Tipo de tarefa" value={tipoManual} onChange={e => setTipoManual(e.target.value)}>
+                  <option value="">Padrão do agente</option>{Object.entries(tarefas).map(([id, t]) => <option value={id} key={id}>{t.label}{t.model ? ` · ${t.model}` : ""}</option>)}
+                </select></label>
+                <p className="dica">{agents[agent]?.model ?? agents[agent]?.cli} {agents[agent]?.effort ? `· ${agents[agent].effort}` : ""}. O elenco da missão mantém prioridade.</p>
+              </details>
+              <footer className="panel-actions"><button className="btn quiet" onClick={() => setVerAgentes(false)}>Cancelar</button><button className="btn solid" disabled={connection !== "connected" || !agents[agent]} onClick={() => { send({ type: "spawn", agent, missionId: active.id, tipo: tipoManual || undefined }); setVerAgentes(false); }}>Abrir {agents[agent]?.label ?? "agente"}</button></footer>
+            </section>
+          </Modal>}
+
+          {verAtividade && <Modal title="Atividade" onClose={() => setVerAtividade(false)}>
+            <section className="activity-panel"><header className="panel-heading"><h2>Atividade</h2><button className="icon-btn" aria-label="Fechar atividade" onClick={() => setVerAtividade(false)}><Icon name="close" /></button></header>
+              <dl className="detail-list">
+                <div><dt>Agentes abertos</dt><dd>{panes.length}</dd></div>
+                <div><dt>Missões neste projeto</dt><dd>{missions.length}</dd></div>
+                <div><dt>Notas de memória</dt><dd>{memoria.length}</dd></div>
+                <div><dt>Custo estimado do projeto</dt><dd>${custoTotal.toFixed(2)}</dd></div>
+              </dl>
+              <Redline />
+              <button className="btn" onClick={() => { setVerAtividade(false); setVerConsumo(true); }}>Detalhar consumo <Icon name="arrow" size={16} /></button>
+            </section>
+          </Modal>}
 
           {aviso && (
             <div className="aviso" role="alert">
@@ -562,6 +538,8 @@ export function App() {
           {verConfig && (
             <Modal title="Ajustes" onClose={() => setVerConfig(false)}>
             <Ajustes
+              colunas={colunas}
+              onColunas={(c) => { setColunas(c); localStorage.setItem("cockpit.colunas", c); }}
               agents={agents}
               squads={squads}
               tarefas={tarefas}
@@ -628,7 +606,7 @@ export function App() {
                     }),
                   )
                 }
-                onSelectMission={(id) => trocar(() => setActiveId(id))}
+                onSelectMission={(id) => trocar(() => { setActiveId(id); setVerWorkspace(false); })}
                 onCreateMission={() => {
                   setVerWorkspace(false);
                   setCriandoMissao(true);
@@ -703,38 +681,6 @@ export function App() {
           {verMaestro && <Modal title="Maestro e continuidade" onClose={() => setVerMaestro(false)}><Maestro missionId={active?.id ?? null} onClose={() => setVerMaestro(false)} onChanged={() => { void fetchConfig().then(c => setAgents(c.agents)); }} /></Modal>}
 
           <div className={`work${arquivo ? " dividido" : ""}`}>
-            {verArquivos && project && (
-              <Arquivos
-                tree={tree}
-                memoria={memoria}
-                arquivoAberto={arquivo}
-                tocado={tocado}
-                onOpenFile={(caminho) =>
-                  trocar(() =>
-                    guarded(async () => {
-                      const f = await fetchFile(activeId, projectId, caminho);
-                      if (activeIdRef.current !== activeId || projectIdRef.current !== projectId) return;
-                      setArquivo(caminho);
-                      setConteudo(f.content);
-                      setSujo(false);
-                      setTocado((prev) => {
-                        const proximo = new Set(prev);
-                        proximo.delete(caminho);
-                        return proximo;
-                      });
-                    }),
-                  )
-                }
-                onEsquecer={(quando) =>
-                  guarded(async () => {
-                    if (!projectId) return;
-                    await deleteNota(projectId, quando);
-                    setMemoria(await fetchMemoria(projectId));
-                  })
-                }
-                onFechar={() => setVerArquivos(false)}
-              />
-            )}
             <div className="panes-wrap">
               {!project ? (
                 <div className="partida">
@@ -784,15 +730,11 @@ export function App() {
                     Um especialista você comanda direto.
                   </p>
                 </div>
-              ) : (
-                <PaneGrid
-                  panes={visible}
-                  agents={agents}
-                  usos={usos}
-                  colunas={colunas}
-                  onClose={(paneId) => send({ type: "kill", paneId })}
-                />
-              )}
+              ) : null}
+              <PaneGrid panes={panes} missionId={active?.id ?? null} agents={agents} usos={usos}
+                colunas={colunas} selectedId={selecionado}
+                onClose={paneId => send({ type: "kill", paneId })} />
+
             </div>
 
             {arquivo && (
@@ -821,42 +763,7 @@ export function App() {
               </Suspense>
             )}
           </div>
-        </div>
-      </div>
-
-      <div className="gauges">
-        <Redline />
-        <span className="gauge">
-          painéis <b>{panes.length}</b>
-        </span>
-        <span className="gauge">
-          missões <b>{missions.length}</b>
-        </span>
-        <span className="gauge">
-          memória <b>{memoria.length}</b>
-        </span>
-        {active && (
-          <>
-            <span className="gauge">
-              head <b>{active.git.head ?? "—"}</b>
-            </span>
-            <span className={`gauge${active.git.dirty > 0 ? " alerta" : ""}`}>
-              alterados <b>{active.git.dirty}</b>
-            </span>
-          </>
-        )}
-        <button
-          className="gauge clicavel"
-          onClick={() => setVerConsumo(true)}
-          title="Ver o consumo de Claude e Gemini"
-        >
-          custo estimado <b>${custoTotal.toFixed(2)}</b>
-        </button>
-        {project && (
-          <span className="gauge raiz" title={project.root}>
-            {project.root}
-          </span>
-        )}
+        </main>
       </div>
     </div>
   );
