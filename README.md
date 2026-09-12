@@ -46,6 +46,8 @@ Feche e abra o Cockpit, ou entre em **Ajustes → Provedores** e atualize a list
 
 Para usar o terminal interno, instale também o Git for Windows. Caso ele não esteja em `C:\Program Files\Git\bin\bash.exe`, abra `cockpit.json` e ajuste `clis.bash.command` para o caminho correto, ou remova esse provedor.
 
+Os agentes abertos pelo cockpit executam sem pedidos de aprovação: Codex e suas pontes usam `--dangerously-bypass-approvals-and-sandbox`; Claude e Antigravity usam `--dangerously-skip-permissions`. Isso vale para maestros e especialistas, inclusive em worktrees. O worktree separa os arquivos Git, mas não limita o acesso à máquina. Permanecem as permissões da conta do sistema, autenticações e políticas administrativas dos provedores. Mudanças nesses argumentos exigem reiniciar o servidor e abrir novos painéis; sessões existentes mantêm suas permissões originais.
+
 ## IA de graça, pelo OpenRouter
 
 O OpenRouter reúne modelos de vários laboratórios num endereço só, e uma parte

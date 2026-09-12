@@ -12,6 +12,7 @@ import { definirModelo } from "./agy.ts";
 import { resolverHarness, type Pedido } from "./harness.ts";
 import { argsDaPonte, envDaPonte, pontede } from "./ponte.ts";
 import { indiceParaPrompt, skillsDoAgente } from "./skills.ts";
+import { argsDePermissao } from "./permissoes.ts";
 
 export type PaneStatus = "run" | "idle" | "dead";
 
@@ -231,6 +232,7 @@ export function spawnPane(
   const spec: AgentSpec = { ...perfil, cli: bundle.cli, model: bundle.model, effort: bundle.effort };
   const args: string[] = [...(spec.args ?? [])];
   const familia = familiaDo(spec.cli);
+  args.push(...argsDePermissao(familia));
   let sessionId: string | null = null;
   const maestro = spec.maestro === true;
 
@@ -305,11 +307,6 @@ export function spawnPane(
     // Os `-c` da ponte vêm antes dos demais para que qualquer ajuste dela
     // possa ser sobreposto pelo que o painel decidir depois.
     args.push(...argsDaPonte(spec.cli));
-
-    // Painéis do cockpit precisam trabalhar sem alguém aprovando cada comando.
-    // O sandbox continua limitado ao projeto; "never" só troca perguntas por
-    // falha imediata quando uma ação estiver fora desse limite.
-    args.push("--sandbox", "workspace-write", "--ask-for-approval", "never");
 
     // Assim como --strict-mcp-config no Claude, não carregue os MCPs pessoais
     // em todo especialista. Além do custo de subida, um MCP sem login deixa o
