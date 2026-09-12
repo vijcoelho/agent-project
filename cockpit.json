@@ -26,7 +26,7 @@
       "command": "agy"
     },
     "bash": {
-      "command": "C:/Program Files/Git/bin/bash.exe",
+      "command": "/bin/bash",
       "args": [
         "-i",
         "-l"
@@ -53,6 +53,9 @@
         },
         "nota": "modelos de preço zero, com o limite diário que o OpenRouter aplica à conta gratuita. A chave é sua e fica cifrada em ~/.cockpit."
       }
+    },
+    "gemini": {
+      "command": "gemini"
     }
   },
   "modelos": {

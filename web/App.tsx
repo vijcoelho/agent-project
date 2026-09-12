@@ -14,6 +14,7 @@ import { Microfone } from "./Microfone.tsx";
 import { Consumo } from "./Consumo.tsx";
 import { Redline } from "./Redline.tsx";
 import { escolherPasta } from "./pasta.ts";
+import { NavegadorPastas } from "./NavegadorPastas.tsx";
 import { NovaMissao, type Plano } from "./NovaMissao.tsx";
 import { Ajustes } from "./Ajustes.tsx";
 import {
@@ -52,6 +53,7 @@ const Editor = lazy(() => import("./Editor.tsx").then((module) => ({ default: mo
 export function App() {
   const connection = useSyncExternalStore(subscribeConnection, getConnection);
   const [verWorkspace, setVerWorkspace] = useState(false);
+  const [mostrarNavegador, setMostrarNavegador] = useState(false);
   const [verMissao, setVerMissao] = useState(false);
   const [verAgentes, setVerAgentes] = useState(false);
   const [verAtividade, setVerAtividade] = useState(false);
@@ -312,6 +314,18 @@ export function App() {
       setBusy(false);
     }
   };
+
+  const aoEscolherPeloNavegador = useCallback(
+    (caminho: string) => {
+      setMostrarNavegador(false);
+      guarded(async () => {
+        const p = await postProject(caminho);
+        await recarregarProjetos();
+        setProjectId(p.id);
+      });
+    },
+    [recarregarProjetos],
+  );
 
   // ---------- voz: aperta, fala, solta ----------
 
@@ -582,8 +596,14 @@ export function App() {
                   guarded(async () => {
                     setEscolhendo(true);
                     try {
-                      const { caminho } = await escolherPasta();
-                      if (!caminho) return; // você cancelou
+                      const resultado = await escolherPasta();
+                      if (resultado.navegar) {
+                        setEscolhendo(false);
+                        setMostrarNavegador(true);
+                        return;
+                      }
+                      if (!resultado.caminho) return;
+                      const caminho = resultado.caminho;
                       const p = await postProject(caminho);
                       await recarregarProjetos();
                       setProjectId(p.id);
@@ -679,6 +699,17 @@ export function App() {
 
           {verConsumo && <Modal title="Consumo" onClose={() => setVerConsumo(false)}><Consumo onFechar={() => setVerConsumo(false)} /></Modal>}
           {verMaestro && <Modal title="Maestro e continuidade" onClose={() => setVerMaestro(false)}><Maestro missionId={active?.id ?? null} onClose={() => setVerMaestro(false)} onChanged={() => { void fetchConfig().then(c => setAgents(c.agents)); }} /></Modal>}
+          
+          {mostrarNavegador && (
+            <div className="fundo-modal" onClick={() => setMostrarNavegador(false)}>
+              <div onClick={(e) => e.stopPropagation()}>
+                <NavegadorPastas
+                  onEscolher={aoEscolherPeloNavegador}
+                  onCancelar={() => setMostrarNavegador(false)}
+                />
+              </div>
+            </div>
+          )}
 
           <div className={`work${arquivo ? " dividido" : ""}`}>
             <div className="panes-wrap">
@@ -691,8 +722,14 @@ export function App() {
                       guarded(async () => {
                         setEscolhendo(true);
                         try {
-                          const { caminho } = await escolherPasta();
-                          if (!caminho) return;
+                          const resultado = await escolherPasta();
+                          if (resultado.navegar) {
+                            setEscolhendo(false);
+                            setMostrarNavegador(true);
+                            return;
+                          }
+                          if (!resultado.caminho) return;
+                          const caminho = resultado.caminho;
                           const p = await postProject(caminho);
                           await recarregarProjetos();
                           setProjectId(p.id);

@@ -4,7 +4,9 @@ import { createServer } from "node:http";
 import { WebSocketServer, type WebSocket } from "ws";
 import { fileURLToPath } from "node:url";
 import { config, salvarConfig, type Elenco } from "./config.ts";
-import { join } from "node:path";
+import { join, resolve, dirname } from "node:path";
+import { homedir } from "node:os";
+import { existsSync, readdirSync } from "node:fs";
 import { Continuity, detectLimit, type LimitSignal } from "./continuity.ts";
 import { readCodexQuota, type Quota } from "./codex-quota.ts";
 import {
@@ -753,12 +755,37 @@ app.get("/api/consumo", (req, res) => {
 
 app.get("/api/projects", (_req, res) => res.json({ projects: listProjects() }));
 
-/** Abre o seletor nativo do Windows e devolve o caminho escolhido. */
+/** Abre o seletor nativo ou sinaliza ao frontend para usar o navegador embutido. */
 app.post("/api/escolher-pasta", (_req, res) => {
   escolherPasta().then(
-    (caminho) => res.json({ caminho }),
+    (resultado) => res.json(resultado),
     (err: Error) => fail(res, err),
   );
+});
+
+/** Lista subdiretórios para o navegador de pastas embutido. */
+app.post("/api/listar-diretorios", (req, res) => {
+  try {
+    const caminho = String(req.body.path || homedir());
+    const absoluto = resolve(caminho);
+    if (!existsSync(absoluto)) {
+      res.json({ path: absoluto, dirs: [], parent: dirname(absoluto) });
+      return;
+    }
+    const entradas = readdirSync(absoluto, { withFileTypes: true })
+      .filter((e) => {
+        if (!e.isDirectory()) return false;
+        if (e.name.startsWith(".")) return false;
+        // Verifica se temos permissão de leitura
+        try { readdirSync(join(absoluto, e.name)); return true; }
+        catch { return false; }
+      })
+      .map((e) => e.name)
+      .sort((a, b) => a.localeCompare(b));
+    res.json({ path: absoluto, dirs: entradas, parent: dirname(absoluto) });
+  } catch (err) {
+    fail(res, err);
+  }
 });
 
 app.post("/api/projects", (req, res) => {

@@ -182,7 +182,11 @@ export const fetchConfig = () =>
 export const fetchProjects = () => fetch("/api/projects").then(json<{ projects: Project[] }>);
 export const postProject = (root: string) => post("/api/projects", { root }).then(json<Project>);
 export const escolherPasta = () =>
-  post("/api/escolher-pasta", {}).then(json<{ caminho: string | null }>);
+  post("/api/escolher-pasta", {}).then(json<{ caminho: string | null; navegar?: boolean }>);
+export const listarDiretorios = (path?: string) =>
+  post("/api/listar-diretorios", { path: path ?? "" }).then(
+    json<{ path: string; dirs: string[]; parent: string }>,
+  );
 export const closeProject = (id: string) => del(`/api/projects/${id}`).then(json<{ ok: true }>);
 export const prepararGit = (id: string) =>
   post(`/api/projects/${id}/git`, {}).then(json<{ ok: true; pronto: boolean }>);
